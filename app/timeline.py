@@ -12,6 +12,7 @@ The project is public, so no token is needed; AFTERLIFE_GITLAB_READ_TOKEN
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 import time
@@ -19,7 +20,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from html import escape
+from pathlib import Path
 from typing import Callable
+
+import yaml
 
 GITLAB_API = os.environ.get("AFTERLIFE_GITLAB_API", "https://gitlab.com/api/v4")
 PROJECT = os.environ.get("AFTERLIFE_GITLAB_PROJECT", "afterlife-transcend/AFTERLIFE")
@@ -29,6 +33,34 @@ CACHE_SECONDS = 15
 REFRESH_MS = 15_000
 
 Fetch = Callable[[str], object]
+# feature, vigil start -> knocks heard since then (the app's usage store).
+Knocks = Callable[[str, dt.datetime], int]
+POLICY = Path(__file__).resolve().parent.parent / "afterlife" / "policy.yaml"
+
+
+def vigil_minutes() -> float:
+    """The vigil length CI uses: policy, unless overridden like CI's VIGIL_MINUTES."""
+    override = os.environ.get("AFTERLIFE_VIGIL_MINUTES")
+    if override:
+        return float(override)
+    try:
+        return float(yaml.safe_load(POLICY.read_text())["vigil_minutes"])
+    except (OSError, KeyError, TypeError, ValueError):
+        return 10.0
+
+
+def _vigil_clock(stage: dict, job: dict | None, feature: str, knocks: Knocks | None, minutes: float) -> dict:
+    """A running vigil gets its deadline and knock count, for the countdown."""
+    if not job or job["status"] != "running" or not job.get("started_at"):
+        return stage
+    started = dt.datetime.fromisoformat(job["started_at"].replace("Z", "+00:00"))
+    clock = {"deadline": (started + dt.timedelta(minutes=minutes)).isoformat()}
+    if knocks:
+        try:
+            clock["knocks"] = knocks(feature, started)
+        except Exception:  # noqa: BLE001 - the countdown must not take the page down
+            pass
+    return {**stage, **clock}
 
 # GitLab job status -> stage state.
 JOB_STATE = {
@@ -67,7 +99,7 @@ def _from_job(label: str, job: dict | None, note: str = "") -> dict:
     return _stage(label, JOB_STATE.get(job["status"], "waiting"), job.get("web_url"), note)
 
 
-def retirement(fetch: Fetch, mr: dict) -> dict:
+def retirement(fetch: Fetch, mr: dict, knocks: Knocks | None = None, minutes: float | None = None) -> dict:
     feature = mr["source_branch"].removeprefix(BRANCH_PREFIX)
     stages = [
         _stage("Death certificate", "done", mr["web_url"], "Coroner"),
@@ -79,7 +111,8 @@ def retirement(fetch: Fetch, mr: dict) -> dict:
         _from_job("Reviewed", mr_jobs.get("review-check"), "Reviewer agent"),
         _from_job("Gates", mr_jobs.get("verdict-check"), "policy from main"),
         _from_job("Coma", mr_jobs.get("coma"), "flag off"),
-        _from_job("Vigil", mr_jobs.get("vigil"), "listening for knocks"),
+        _vigil_clock(_from_job("Vigil", mr_jobs.get("vigil"), "listening for knocks"), mr_jobs.get("vigil"),
+                     feature, knocks, minutes if minutes is not None else vigil_minutes()),
     ]
 
     resurrect = mr_jobs.get("resurrect")
@@ -126,21 +159,21 @@ def is_retirement(mr: dict) -> bool:
     return mr.get("state") != "closed" or "afterlife::resurrected" in mr.get("labels", [])
 
 
-def build_timeline(fetch: Fetch = gitlab_fetch, limit: int = 8) -> list[dict]:
+def build_timeline(fetch: Fetch = gitlab_fetch, limit: int = 8, knocks: Knocks | None = None) -> list[dict]:
     mrs = fetch("/merge_requests?state=all&order_by=created_at&sort=desc&per_page=50")
-    return [retirement(fetch, mr) for mr in [mr for mr in mrs if is_retirement(mr)][:limit]]
+    return [retirement(fetch, mr, knocks) for mr in [mr for mr in mrs if is_retirement(mr)][:limit]]
 
 
 _cache: dict = {"at": 0.0, "value": None, "error": None}
 
 
-def cached_timeline(fetch: Fetch = gitlab_fetch) -> tuple[list[dict], str | None]:
+def cached_timeline(fetch: Fetch = gitlab_fetch, knocks: Knocks | None = None) -> tuple[list[dict], str | None]:
     """Shared by every viewer for CACHE_SECONDS, to stay far below GitLab's rate limit."""
     if os.environ.get("AFTERLIFE_TIMELINE") == "off":
         return [], None
     if time.monotonic() - _cache["at"] >= CACHE_SECONDS or _cache["value"] is None:
         try:
-            _cache.update(value=build_timeline(fetch), error=None)
+            _cache.update(value=build_timeline(fetch, knocks=knocks), error=None)
         except (urllib.error.URLError, TimeoutError, KeyError, ValueError) as error:
             _cache.update(error=f"GitLab unavailable ({type(error).__name__}); showing the last known state.")
             _cache["value"] = _cache["value"] or []
@@ -178,17 +211,35 @@ STYLE = """
 @keyframes pulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .step.active::before { animation: none; } }
 .timeline-error { color: var(--warn); font-size: 13px; }
+.countdown { color: var(--warn); font-weight: 700; font-variant-numeric: tabular-nums; }
 """
 
 STATE_WORDS = {"done": "done", "active": "now", "waiting": "queued", "failed": "failed",
                "skipped": "skipped", "todo": "", "knocked": ""}
 
 
+def clock_text(deadline: str, now: dt.datetime | None = None) -> str:
+    """'6:12 left', or 'deciding' once the vigil's time is up (the job still has to report)."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    seconds = int((dt.datetime.fromisoformat(deadline) - now).total_seconds())
+    return "deciding" if seconds <= 0 else f"{seconds // 60}:{seconds % 60:02d} left"
+
+
+def _vigil_detail(stage: dict) -> str:
+    knocks = stage.get("knocks")
+    heard = "" if knocks is None else f" &middot; {knocks} knock{'' if knocks == 1 else 's'}"
+    return (f"<span class='countdown' data-deadline='{escape(stage['deadline'])}'>"
+            f"{escape(clock_text(stage['deadline']))}</span>{heard}")
+
+
 def _step(stage: dict) -> str:
     tag = "a" if stage["url"] else "span"
     href = f" href='{escape(stage['url'])}'" if stage["url"] else ""
-    word = STATE_WORDS[stage["state"]]
-    detail = " &middot; ".join(escape(p) for p in (stage["note"], word) if p)
+    if stage.get("deadline"):
+        detail = _vigil_detail(stage)
+    else:
+        word = STATE_WORDS[stage["state"]]
+        detail = " &middot; ".join(escape(p) for p in (stage["note"], word) if p)
     return f"<{tag} class='step {stage['state']}'{href}><b>{escape(stage['label'])}</b>{detail}</{tag}>"
 
 
@@ -212,6 +263,13 @@ REFRESH_SCRIPT = f"""<script>
 (function () {{
   var box = document.getElementById('timeline');
   if (!box || !window.fetch) return;
+  // Vigil countdowns tick every second between the 15-second refreshes.
+  setInterval(function () {{
+    box.querySelectorAll('.countdown[data-deadline]').forEach(function (el) {{
+      var s = Math.floor((Date.parse(el.dataset.deadline) - Date.now()) / 1000);
+      el.textContent = s <= 0 ? 'deciding' : Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' left';
+    }});
+  }}, 1000);
   setInterval(function () {{
     fetch('/graveyard/timeline', {{cache: 'no-store'}})
       .then(function (r) {{ return r.ok ? r.text() : null; }})

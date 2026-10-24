@@ -143,6 +143,8 @@ prompts:
         - afterlife/policy.yaml and afterlife/graveyard.yaml (read_file).
         - The code: use grep to find anything outside the feature's own module that
           imports or calls it (look in app/ for the module name and its route).
+          app/partner.py is not such a caller: it simulates a partner's website, so
+          its requests are outside traffic the census already counts (AGENTS.md rule 9).
         - Orphans: for each name the feature's module imports from another app module
           (for example `from app.catalog import add_books`), grep app/ for other users.
           A helper nothing else uses would be left behind as dead code, and CI's
@@ -270,6 +272,8 @@ prompts:
         2. No protected path from afterlife/policy.yaml is touched.
         3. Nothing left in app/ still imports or calls what was deleted (grep), and
            every orphaned helper in the verdict is gone, with nothing new left unused.
+           app/partner.py's HTTP requests don't count: it stands in for an outside
+           partner and handles a retired route (AGENTS.md rule 9).
         4. Any dependency removed from requirements.txt is really unused now.
         5. No migration drops data.
 
