@@ -44,7 +44,6 @@ components:
       - "list_all_merge_request_notes"
       - "create_merge_request_note"
     ui_log_events:
-      - "on_agent_reasoning"
       - "on_tool_execution_success"
       - "on_tool_execution_failed"
       - "on_agent_final_answer"
