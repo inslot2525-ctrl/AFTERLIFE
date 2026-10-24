@@ -2,7 +2,7 @@ import datetime as dt
 
 import pytest
 
-from app.features import FEATURES
+from app.tests.planted import PLANTED_FEATURES
 from app.store import InMemoryStore
 from ci.census import build_census, parse_vulture
 from ci.policy import load_policy
@@ -15,7 +15,7 @@ TODAY = dt.date(2026, 10, 24)
 def census():
     store = InMemoryStore()
     seed(store, TODAY)
-    return {f["feature"]: f for f in build_census(FEATURES, store, load_policy(), TODAY)["features"]}
+    return {f["feature"]: f for f in build_census(PLANTED_FEATURES, store, load_policy(), TODAY)["features"]}
 
 
 def test_live_feature_is_not_a_candidate(census):
