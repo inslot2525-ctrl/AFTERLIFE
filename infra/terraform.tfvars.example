@@ -1,0 +1,6 @@
+project_id          = "afterlife-hackathon"
+region              = "europe-north1"
+gitlab_project_path = "gitlab-ai-hackathon/afterlife"
+# From GitLab: Deploy > Feature flags > Configure
+unleash_url         = "https://gitlab.com/api/v4/feature_flags/unleash/<project-id>"
+unleash_instance_id = "<instance-id>"
