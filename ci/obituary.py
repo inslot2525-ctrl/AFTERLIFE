@@ -57,6 +57,13 @@ def render(s: dict, release_url: str | None = None) -> str:
     return "\n".join(lines)
 
 
+def obituary_url(project_url: str | None, issue: int, note: dict | None) -> str | None:
+    if not project_url:
+        return None
+    url = f"{project_url}/-/issues/{issue}"
+    return f"{url}#note_{note['id']}" if note and note.get("id") else url
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--savings", default="savings.json")
@@ -68,8 +75,11 @@ def main() -> None:
     if issue is None:
         print(f"MR !{savings['mr_iid']} has no 'Census-Issue: #N' line; can't post the obituary.")
         sys.exit(1)
-    gitlab.comment_issue(issue, render(savings, os.environ.get("RELEASE_URL")))
+    note = gitlab.comment_issue(issue, render(savings, os.environ.get("RELEASE_URL")))
     print(f"Obituary posted on #{issue}.")
+    # publish_savings runs next in this job; the graveyard links to the obituary.
+    savings["obituary_url"] = obituary_url(os.environ.get("CI_PROJECT_URL"), issue, note)
+    Path(args.savings).write_text(json.dumps(savings, indent=2))
 
 
 if __name__ == "__main__":

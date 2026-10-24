@@ -117,6 +117,15 @@ def test_obituary():
     assert "SCI | not computed" in render(savings(image_before=None))
 
 
+def test_obituary_url_points_at_the_note():
+    from ci.obituary import obituary_url
+
+    base = "https://gitlab.com/afterlife-transcend/AFTERLIFE"
+    assert obituary_url(base, 4, {"id": 99}) == f"{base}/-/issues/4#note_99"
+    assert obituary_url(base, 4, None) == f"{base}/-/issues/4"
+    assert obituary_url(None, 4, {"id": 99}) is None
+
+
 def test_census_issue():
     assert census_issue("text\nCensus-Issue: #42\n") == 42
     assert census_issue("Census-Issue: 42") is None

@@ -216,9 +216,19 @@ prompts:
            `glab mr create --source-branch afterlife/<feature> --target-branch main
            --title "Retire <feature>" --label "afterlife::sunset"
            --description "$(cat /tmp/afterlife-<feature>.md)" --yes`
-           The description holds the death certificate summary, a draft deprecation
-           note for the release, and the Coroner's afterlife-verdict block for this
-           feature copied exactly, in its fenced block.
+           CI parses the description, so use exactly this layout:
+             Census-Issue: #<iid of the triggering census issue>
+             (blank line)
+             ### Death certificate
+             <the Coroner's summary for this feature>
+             (blank line)
+             ### Deprecation note
+             <one or two sentences for the release: what to use instead>
+             (blank line)
+             ### Verdict
+             <the Coroner's afterlife-verdict block for this feature, copied exactly,
+             in its fenced block>
+           The first line must be the Census-Issue line on its own.
 
         Never edit afterlife/policy.yaml, ci/, flows/, infra/, CODEOWNERS, LICENSE or
         any protected path. CI rejects the MR if you do, and you do not merge.
