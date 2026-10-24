@@ -29,58 +29,50 @@ CENSUS_TTL_SECONDS = 300
 router = APIRouter()
 
 STYLE = r"""
-/* --- instrument readouts --------------------------------------------------- */
-.totals { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-top: 54px; counter-reset: readout; }
+/* --- readouts: a row of glass instruments ------------------------------------ */
+.totals { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin-top: 56px; overflow: hidden;
+  background: linear-gradient(180deg, var(--glass-hi), var(--glass)); border: 1px solid var(--edge); border-radius: var(--radius);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); box-shadow: inset 0 1px 0 var(--sheen); }
 @media (max-width: 980px) { .totals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.total { position: relative; padding: 34px 16px 16px; background: var(--panel); border: 1px solid var(--line);
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%); counter-increment: readout; }
-.total::before { content: "R-" counter(readout, decimal-leading-zero); position: absolute; top: 12px; left: 16px;
-  font: 500 10px/1 var(--mono); letter-spacing: 0.14em; color: var(--faint); }
-.total::after { content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: 34%; background: var(--line-hi); }
-.total b { display: block; font: 600 clamp(30px, 3.6vw, 44px)/1 var(--display); letter-spacing: 0.01em;
-  font-variant-numeric: tabular-nums; color: var(--ink); }
-.total span { display: block; margin-top: 10px; font: 500 10.5px/1.35 var(--display); letter-spacing: 0.16em;
-  text-transform: uppercase; color: var(--quiet); }
-.total.good b { color: var(--specimen); text-shadow: 0 0 24px rgba(111, 242, 166, 0.35); }
-.total.good::after { background: var(--specimen); width: 100%; }
+.total { padding: 26px 22px 24px; border-left: 1px solid var(--edge); }
+.total:first-child { border-left: 0; }
+.total b { display: block; font: 400 clamp(24px, 2.8vw, 34px)/1 var(--display); font-variant-numeric: tabular-nums; color: var(--ink); }
+.total span { display: block; margin-top: 14px; font: 400 10.5px/1.4 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+.total.good b { color: var(--mint); text-shadow: 0 0 28px rgba(147, 240, 200, 0.35); }
 
-/* --- specimen cards: toe tags for retired features ----------------------- */
-.stones { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 22px; padding-top: 10px; }
-.stone { position: relative; padding: 26px 24px 0 58px; background: var(--panel); border: 1px solid var(--line);
-  clip-path: polygon(0 18px, 18px 0, 100% 0, 100% 100%, 0 100%); transition: border-color .2s, transform .3s var(--ease); }
-.stone:hover { border-color: var(--line-hi); transform: translateY(-3px); }
-.stone::before { content: ""; position: absolute; left: 20px; top: 26px; width: 14px; height: 14px; border-radius: 50%;
-  border: 2px solid var(--hazard); box-shadow: 0 0 0 4px var(--hazard-soft); }
-.stone::after { content: ""; position: absolute; left: 26px; top: 42px; bottom: 0; width: 2px;
-  background: repeating-linear-gradient(var(--line-hi) 0 4px, transparent 4px 8px); }
-.stone .rip { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
-  font: 600 10.5px/1 var(--display); letter-spacing: 0.28em; color: var(--quiet); }
-.stone .rip::after { content: "DECEASED"; color: var(--alarm); border: 2px solid var(--alarm); padding: 5px 8px 4px;
-  letter-spacing: 0.24em; transform: rotate(-6deg); opacity: .9; }
-.stone h3 { margin: 0; font: 700 clamp(24px, 2.6vw, 30px)/1.05 var(--display); letter-spacing: 0.01em;
-  text-transform: uppercase; overflow-wrap: anywhere; color: var(--ink); }
-.stone .route { margin-top: 8px; font: 500 12.5px/1 var(--mono); color: var(--scan); }
-.stone .dates { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 18px 0; padding: 12px 0;
-  border-top: 1px dashed var(--line-hi); border-bottom: 1px dashed var(--line-hi);
-  font: 500 12px/1.4 var(--mono); color: var(--ink); }
-.stone .dates::before { content: "LIFESPAN"; font: 600 10px/1.6 var(--display); letter-spacing: 0.2em; color: var(--faint); }
-.stone .cause { margin: 0 0 18px; font-size: 13px; line-height: 1.6; color: var(--quiet); }
-.stone .cause::before { content: "CAUSE OF DEATH // "; display: block; margin-bottom: 4px;
-  font: 600 10px/1 var(--display); letter-spacing: 0.2em; color: var(--hazard); }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
-.chip { padding: 5px 8px; font: 500 11px/1 var(--mono); color: var(--ink); background: var(--panel-hi); border: 1px solid var(--line);
-  font-variant-numeric: tabular-nums; }
-.chip.good { color: var(--specimen); border-color: rgba(111, 242, 166, 0.35); background: var(--specimen-soft); }
-.pending { color: var(--hazard); font-size: 12.5px; margin: 0 0 18px; }
-.links { display: flex; flex-wrap: wrap; gap: 0; margin: 0 -24px 0 -58px; border-top: 1px solid var(--line); }
-.links a { flex: 1 1 auto; padding: 12px 10px; text-align: center; font: 600 10.5px/1 var(--display); letter-spacing: 0.16em;
-  text-transform: uppercase; color: var(--quiet); border-right: 1px solid var(--line); }
+/* --- specimen cards: glass toe tags ------------------------------------------ */
+.stones { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; padding-top: 12px; }
+.stone { position: relative; padding: 26px 26px 0; overflow: hidden;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02) 60%);
+  border: 1px solid var(--edge); border-radius: var(--radius); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  box-shadow: inset 0 1px 0 var(--sheen), 0 40px 70px -45px rgba(0, 0, 0, 0.9); transition: transform .5s var(--ease), border-color .3s; }
+.stone:hover { transform: translateY(-4px); border-color: var(--edge-hi); }
+.stone::before { content: ""; position: absolute; top: 24px; right: 24px; width: 12px; height: 12px; border-radius: 50%;
+  border: 1px solid var(--edge-hi); box-shadow: inset 0 0 0 3px rgba(5, 6, 8, 0.9), 0 0 0 1px var(--edge); }
+.stone::after { content: ""; position: absolute; inset: -40% -20% auto auto; width: 70%; height: 80%; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(166, 220, 255, 0.10), transparent); }
+.stone .rip { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; font: 400 10px/1 var(--display); letter-spacing: 0.3em; color: var(--faint); }
+.stone .rip::after { content: "DECEASED"; padding: 5px 9px; border-radius: 999px; font: 500 9.5px/1 var(--mono); letter-spacing: 0.16em;
+  color: var(--coral); background: var(--coral-soft); }
+.stone h3 { margin: 0; font: 400 clamp(18px, 2vw, 22px)/1.3 var(--display); letter-spacing: 0.04em; text-transform: uppercase;
+  overflow-wrap: anywhere; color: var(--ink); }
+.stone .route { margin-top: 8px; font: 400 12.5px/1 var(--mono); color: var(--ice); }
+.stone .dates { margin: 20px 0 16px; font: 400 12px/1 var(--mono); letter-spacing: 0.06em; color: var(--quiet); }
+.stone .dates::before { content: "LIFESPAN  "; color: var(--faint); letter-spacing: 0.14em; }
+.stone .cause { margin: 0 0 20px; font-size: 13px; line-height: 1.7; color: var(--quiet); }
+.stone .cause::before { content: "CAUSE OF DEATH"; display: block; margin-bottom: 6px; font: 400 9.5px/1 var(--display);
+  letter-spacing: 0.24em; color: var(--faint); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.chip { padding: 6px 10px; border-radius: 999px; font: 400 11px/1 var(--mono); color: var(--ink); background: var(--glass-hi);
+  border: 1px solid var(--edge); font-variant-numeric: tabular-nums; }
+.chip.good { color: var(--mint); background: var(--mint-soft); border-color: transparent; }
+.pending { color: var(--ice); font-size: 12.5px; margin: 0 0 20px; }
+.links { display: flex; flex-wrap: wrap; margin: 0 -26px; border-top: 1px solid var(--edge); }
+.links a { flex: 1 1 auto; padding: 14px 10px; text-align: center; font: 400 9.5px/1 var(--display); letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--quiet); border-right: 1px solid var(--edge); transition: background .2s, color .2s; }
 .links a:last-child { border-right: 0; }
-.links a::after { content: " \2192"; }
-.links a:hover { color: var(--bg); background: var(--hazard); }
-.links::after { content: ""; flex: 0 0 100%; height: 18px;
-  background: repeating-linear-gradient(90deg, var(--line-hi) 0 2px, transparent 2px 5px, var(--line-hi) 5px 6px, transparent 6px 9px); opacity: .5; }
+.links a:hover { color: var(--ink); background: var(--glass-hi); }
 """
 
 
