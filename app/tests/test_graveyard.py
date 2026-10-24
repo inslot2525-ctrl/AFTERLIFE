@@ -123,6 +123,7 @@ def test_verdicts_load_on_first_request_after_a_cold_start(monkeypatch):
     from app import verdicts
 
     monkeypatch.setenv("AFTERLIFE_GITLAB_READ_TOKEN", "test")
+    monkeypatch.delenv("AFTERLIFE_TIMELINE")  # conftest turns GitLab reads off
     monkeypatch.setattr(verdicts, "_cache", {"at": 0.0, "value": ([], None), "loaded": False})
     monkeypatch.setattr(verdicts.time, "monotonic", lambda: 3.0)  # container up 3 s
     issue = {"iid": 2, "title": "AFTERLIFE census 2"}
