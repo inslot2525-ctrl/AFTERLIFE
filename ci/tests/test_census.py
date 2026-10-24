@@ -60,3 +60,10 @@ def test_parse_vulture_groups_by_file():
     findings = parse_vulture(output)
     assert findings["app/features/books_v1.py"] == ["line 22: unused function 'list_books_v1' (60% confidence)"]
     assert "app/catalog.py" in findings
+
+
+def test_partner_widget_fades_out_instead_of_stopping(census):
+    # An abrupt stop reads as a measurement gap; a fade reads as a dying integration.
+    months = list(census["embed_widget"]["monthly_calls"].values())
+    steady, fading, last = max(months), months[-2], months[-1]
+    assert 0 < last < fading < steady / 2

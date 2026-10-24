@@ -81,3 +81,15 @@ def test_changes_without_dead_verdict_fail(policy):
 
 def test_unknown_feature_fails(policy):
     assert check([dead("ghost", ["app/features/ghost.py"])], {"features": []}, policy, ["app/features/ghost.py"])
+
+
+def test_orphan_files_must_be_in_the_verdict(policy):
+    census = {"features": [signals("import_goodreads")]}
+    verdict = dead("import_goodreads", ["app/features/import_goodreads.py", "app/catalog.py"])
+    verdict["orphans"] = ["app/catalog.py:add_books"]
+    changes = ["app/features/import_goodreads.py", "app/catalog.py", "app/features/__init__.py"]
+    assert check([verdict], census, policy, changes) == []
+
+    verdict["files"] = ["app/features/import_goodreads.py"]
+    problems = check([verdict], census, policy, changes)
+    assert any("orphan app/catalog.py:add_books" in p for p in problems)

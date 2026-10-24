@@ -42,6 +42,13 @@ def check_dead(verdict: dict, signals: dict, policy: dict) -> list[str]:
         problems.append(f"{name}: confidence {verdict['confidence']} below {policy['min_confidence']}")
     if not verdict["evidence"]:
         problems.append(f"{name}: DEAD without evidence")
+    # Orphaned helpers ("path:name") must live in files the verdict covers, or the
+    # Undertaker's edit to remove them would fail the scope check below.
+    files = {f.replace("\\", "/") for f in verdict["files"]}
+    for orphan in verdict.get("orphans") or []:
+        path = orphan.split(":", 1)[0].replace("\\", "/")
+        if path not in files:
+            problems.append(f"{name}: orphan {orphan} is in {path}, which is not in the verdict's files")
     return problems
 
 
