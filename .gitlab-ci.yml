@@ -67,6 +67,8 @@ build-image:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
+    # dind can take longer than the runner's 30 s service check on a laptop.
+    - for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
   script:
     - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" .
