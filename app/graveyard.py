@@ -15,6 +15,7 @@ import yaml
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from app import timeline
 from app.features import FEATURES
 from app.registry import Feature
 from app.store import UsageStore
@@ -191,14 +192,18 @@ def _table(entries: list[dict], columns: list[tuple[str, str]], empty: str) -> s
 
 
 def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = None,
-           window_days: int = 30) -> str:
+           window_days: int = 30, timeline_html: str | None = None) -> str:
     t = totals(ledger["retired"], savings)
     stones = ("".join(_stone(tomb, savings) for tomb in ledger["retired"])
               or "<p class='empty'>Nothing retired yet.</p>")
+    live = ("" if timeline_html is None else
+            "<h2>Retirements, live</h2><p class='lead'>Each stage is a GitLab job; click one to open it. "
+            f"This section refreshes every {timeline.REFRESH_MS // 1000} seconds.</p>"
+            f"<section id='timeline'>{timeline_html}</section>")
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-        f"<title>Graveyard</title><style>{STYLE}</style></head><body><main>"
+        f"<title>Graveyard</title><style>{STYLE}{timeline.STYLE}</style></head><body><main>"
         "<h1>Graveyard</h1>"
         "<p class='lead'>Features AFTERLIFE retired from Shelf, what each one cost while it was alive, "
         "and the ones it chose to keep.</p>"
@@ -210,7 +215,8 @@ def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = N
         + _total("MB image saved", t["image_mb_saved"])
         + _total("gCO2e saved per pipeline run", t["sci_gco2e_saved"])
         + "</section>"
-        f"<h2>Retired</h2><section class='stones'>{stones}</section>"
+        + live
+        + f"<h2>Retired</h2><section class='stones'>{stones}</section>"
         "<h2>Hibernating</h2>"
         + _table(ledger["hibernating"], [("Feature", "feature"), ("Why it was kept", "reason"),
                                          ("Check again", "recheck")], "No hibernating features.")
@@ -229,7 +235,9 @@ def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = N
                                 ("Candidate", "candidate")], "No usage recorded yet.")
         + "<footer>Every number is measured by a CI job and links to it. Usage history in this demo is "
         "simulated and labelled as such in the census.</footer>"
-        "</main></body></html>"
+        "</main>"
+        + (timeline.REFRESH_SCRIPT if timeline_html is not None else "")
+        + "</body></html>"
     )
 
 
@@ -237,4 +245,11 @@ def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = N
 def graveyard(request: Request) -> str:
     store = request.app.state.store
     window = census_window_days()
-    return render(load_ledger(), store.all_savings(), cached_census(store, window), window)
+    return render(load_ledger(), store.all_savings(), cached_census(store, window), window,
+                  timeline.render_timeline(*timeline.cached_timeline()))
+
+
+@router.get("/graveyard/timeline", response_class=HTMLResponse)
+def graveyard_timeline() -> str:
+    """The timeline section alone, for the page's 15-second refresh."""
+    return timeline.render_timeline(*timeline.cached_timeline())
