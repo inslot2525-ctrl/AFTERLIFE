@@ -42,18 +42,30 @@ STYLE = """
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink);
   font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 48px; }
-h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
-h2 { font-size: 18px; margin: 36px 0 12px; }
+main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 48px; }
+a { color: var(--accent); }
+code, .mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.92em; }
+nav { display: flex; gap: 18px; align-items: baseline; padding-bottom: 14px; margin-bottom: 28px;
+  border-bottom: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
+nav .brand { font-weight: 700; color: var(--ink); text-decoration: none; letter-spacing: 0.04em; margin-right: auto; }
+nav a { color: var(--quiet); text-decoration: none; }
+nav a:hover, nav a[aria-current] { color: var(--ink); }
+h1 { font-size: 32px; margin: 0 0 6px; letter-spacing: -0.02em; }
+h2 { font-size: 18px; margin: 40px 0 12px; display: flex; align-items: baseline; gap: 8px; scroll-margin-top: 16px; }
+h2 .count { color: var(--quiet); font-weight: 500; font-size: 14px; font-variant-numeric: tabular-nums; }
 .lead { color: var(--quiet); margin: 0 0 24px; max-width: 680px; }
+h2 + .lead { margin-top: -4px; font-size: 14px; }
 .totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .total { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-.total b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; }
+.total b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .total span { color: var(--quiet); font-size: 13px; }
-.stones { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-.stone { background: var(--stone); border: 1px solid var(--line); border-radius: 120px 120px 12px 12px;
-  padding: 40px 20px 18px; text-align: center; }
-.stone h3 { margin: 0; font-size: 18px; }
+.total.good b { color: var(--good); }
+.stones { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px 16px;
+  padding-bottom: 14px; border-bottom: 6px solid var(--line); }
+.stone { background: linear-gradient(180deg, var(--card), var(--stone)); border: 1px solid var(--line);
+  border-bottom-width: 3px; border-radius: 140px 140px 8px 8px; padding: 34px 22px 18px; text-align: center; }
+.stone .rip { font-size: 11px; letter-spacing: 0.3em; color: var(--quiet); margin-bottom: 8px; }
+.stone h3 { margin: 0; font: 600 20px/1.3 Georgia, "Times New Roman", serif; overflow-wrap: anywhere; }
 .stone .route { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--quiet); }
 .stone .dates { margin: 6px 0 10px; font-size: 13px; color: var(--quiet); }
 .stone .cause { font-style: italic; margin: 0 0 14px; }
@@ -67,7 +79,12 @@ table { width: 100%; border-collapse: collapse; background: var(--card); border:
   border-radius: 12px; overflow: hidden; }
 th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font-size: 12.5px; color: var(--quiet); font-weight: 600; }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 tr:last-child td { border-bottom: 0; }
+.pill { display: inline-block; font-size: 12px; border: 1px solid currentColor; border-radius: 999px;
+  padding: 0 9px; white-space: nowrap; }
+.pill.candidate { color: var(--warn); } .pill.alive { color: var(--good); } .pill.protected { color: var(--accent); }
+.pill.quiet { color: var(--quiet); }
 .empty { color: var(--quiet); }
 .scroll { overflow-x: auto; }
 footer { margin-top: 40px; color: var(--quiet); font-size: 13px; }
@@ -136,9 +153,45 @@ def totals(retired: list[dict], savings: dict[str, dict]) -> dict:
     }
 
 
-def _total(label: str, value) -> str:
-    shown = "&mdash;" if value is None else escape(_num(value, 4) if isinstance(value, float) and value < 1 else _num(value))
-    return f"<div class='total'><b>{shown}</b><span>{escape(label)}</span></div>"
+def _total(label: str, value, digits: int = 1, good: bool = False) -> str:
+    shown = "&mdash;" if value is None else escape(_num(value, digits))
+    lit = " good" if good and value else ""
+    return f"<div class='total{lit}'><b>{shown}</b><span>{escape(label)}</span></div>"
+
+
+def nav(current: str) -> str:
+    """The bar shared by Shelf's pages, so the video can move between them."""
+    links = [("Reading list", "/"), ("Graveyard", "/graveyard")]
+    items = "".join(
+        f"<a href='{href}'{' aria-current=\"page\"' if label == current else ''}>{label}</a>"
+        for label, href in links
+    )
+    return f"<nav><a class='brand' href='/'>SHELF</a>{items}</nav>"
+
+
+def _h2(title: str, count: int | None = None, anchor: str = "") -> str:
+    shown = "" if count is None else f"<span class='count'>{count}</span>"
+    ident = f" id='{anchor}'" if anchor else ""
+    return f"<h2{ident}>{escape(title)}{shown}</h2>"
+
+
+def _when(value) -> str:
+    """2026-10-26T12:03:00Z -> 2026-10-26 12:03 UTC; anything else is shown as given."""
+    try:
+        at = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return escape(str(value))
+    if at.tzinfo:
+        at = at.astimezone(dt.timezone.utc)
+    return f"{at:%Y-%m-%d %H:%M} UTC"
+
+
+def _census_status(row: dict, protected: set[str]) -> str:
+    if row["feature"] in protected:
+        return "<span class='pill protected'>protected</span>"
+    if row["candidate"] == "yes":
+        return "<span class='pill candidate'>candidate</span>"
+    return "<span class='pill alive'>in use</span>"
 
 
 def _chips(s: dict) -> str:
@@ -171,6 +224,7 @@ def _stone(tomb: dict, savings: dict[str, dict]) -> str:
                 else "<p class='pending'>Savings not measured yet: they appear after the release ships.</p>")
     return (
         "<article class='stone'>"
+        "<div class='rip'>HERE LIES</div>"
         f"<h3>{escape(str(tomb.get('feature', '?')))}</h3>"
         f"<div class='route'>{escape(str(tomb.get('route', '')))}</div>"
         f"<div class='dates'>{escape(str(tomb.get('born', '?')))} &ndash; {escape(str(tomb.get('died', '?')))}</div>"
@@ -180,12 +234,22 @@ def _stone(tomb: dict, savings: dict[str, dict]) -> str:
     )
 
 
-def _table(entries: list[dict], columns: list[tuple[str, str]], empty: str) -> str:
+def _table(entries: list[dict], columns: list[tuple[str, str]], empty: str,
+           cells: dict | None = None, classes: dict[str, str] | None = None) -> str:
+    """cells maps a column key to a function returning that cell's (already escaped) HTML."""
     if not entries:
         return f"<p class='empty'>{escape(empty)}</p>"
-    head = "".join(f"<th>{escape(title)}</th>" for title, _ in columns)
+    cells, classes = cells or {}, classes or {}
+
+    def cls(key: str) -> str:
+        return f" class='{classes[key]}'" if key in classes else ""
+
+    def cell(entry: dict, key: str) -> str:
+        return cells[key](entry) if key in cells else escape(str(entry.get(key, "")))
+
+    head = "".join(f"<th{cls(key)}>{escape(title)}</th>" for title, key in columns)
     rows = "".join(
-        "<tr>" + "".join(f"<td>{escape(str(entry.get(key, '')))}</td>" for _, key in columns) + "</tr>"
+        "<tr>" + "".join(f"<td{cls(key)}>{cell(entry, key)}</td>" for _, key in columns) + "</tr>"
         for entry in entries
     )
     return f"<div class='scroll'><table><tr>{head}</tr>{rows}</table></div>"
@@ -197,42 +261,57 @@ def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = N
     stones = ("".join(_stone(tomb, savings) for tomb in ledger["retired"])
               or "<p class='empty'>Nothing retired yet.</p>")
     live = ("" if timeline_html is None else
-            "<h2>Retirements, live</h2><p class='lead'>Each stage is a GitLab job; click one to open it. "
+            _h2("Retirements, live", anchor="live")
+            + "<p class='lead'>Each stage is a GitLab job; click one to open it. "
             f"This section refreshes every {timeline.REFRESH_MS // 1000} seconds.</p>"
             f"<section id='timeline'>{timeline_html}</section>")
+    protected = {p.get("feature") for p in ledger["protected"]}
+    mono = {"route": lambda e: f"<span class='mono'>{escape(str(e.get('route', '')))}</span>"}
+    feature = {"feature": lambda e: f"<b>{escape(str(e.get('feature', '')))}</b>"}
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
         f"<title>Graveyard</title><style>{STYLE}{timeline.STYLE}</style></head><body><main>"
-        "<h1>Graveyard</h1>"
+        + nav("Graveyard")
+        + "<h1>Graveyard</h1>"
         "<p class='lead'>Features AFTERLIFE retired from Shelf, what each one cost while it was alive, "
         "and the ones it chose to keep.</p>"
         "<section class='totals'>"
         + _total("features retired", t["retired"])
         + _total("lines removed", t["lines_removed"])
         + _total("dependencies removed", t["deps_removed"])
-        + _total("CVEs removed", t["cves_removed"])
+        + _total("CVEs removed", t["cves_removed"], good=True)
         + _total("MB image saved", t["image_mb_saved"])
-        + _total("gCO2e saved per pipeline run", t["sci_gco2e_saved"])
+        + _total("gCO2e saved per pipeline run", t["sci_gco2e_saved"], digits=4, good=True)
         + "</section>"
         + live
-        + f"<h2>Retired</h2><section class='stones'>{stones}</section>"
-        "<h2>Hibernating</h2>"
+        + _h2("Retired", len(ledger["retired"]), "retired") + f"<section class='stones'>{stones}</section>"
+        + _h2("Hibernating", len(ledger["hibernating"]), "hibernating")
+        + "<p class='lead'>Quiet, but not dead. The Coroner refused to retire these.</p>"
         + _table(ledger["hibernating"], [("Feature", "feature"), ("Why it was kept", "reason"),
-                                         ("Check again", "recheck")], "No hibernating features.")
-        + "<h2>Resurrected</h2>"
+                                         ("Check again", "recheck")], "No hibernating features.", cells=feature)
+        + _h2("Resurrected", len(ledger["resurrected"]), "resurrected")
+        + "<p class='lead'>Switched off for the vigil, then somebody knocked. Nothing was deleted.</p>"
         + _table(ledger["resurrected"], [("Feature", "feature"), ("Who knocked", "caller"),
                                          ("When", "knocked_at"), ("Why", "reason"), ("Check again", "recheck")],
-                 "Nobody has knocked yet.")
-        + "<h2>Protected</h2>"
-        + _table(ledger["protected"], [("Feature", "feature"), ("Reason", "reason")], "No protected features.")
-        + "<h2>Census</h2>"
+                 "Nobody has knocked yet.",
+                 cells={**feature, "caller": lambda e: f"<span class='mono'>{escape(str(e.get('caller', '')))}</span>",
+                        "knocked_at": lambda e: _when(e.get("knocked_at", ""))})
+        + _h2("Protected", len(ledger["protected"]), "protected")
+        + "<p class='lead'>Never auto-retired, however quiet. Policy decides, not the agents.</p>"
+        + _table(ledger["protected"], [("Feature", "feature"), ("Reason", "reason")], "No protected features.",
+                 cells=feature)
+        + _h2("Census", len(census or []), "census")
         + f"<p class='lead'>Every live feature, quietest first. A feature with no calls in the last "
         f"{window_days} days is a candidate; the Coroner decides whether it is really dead.</p>"
         + _table(census or [], [("Feature", "feature"), ("Route", "route"),
                                 (f"Calls, last {window_days} days", "calls_in_window"),
                                 ("Last call", "last_seen"), ("Days silent", "days_silent"),
-                                ("Candidate", "candidate")], "No usage recorded yet.")
+                                ("Status", "candidate")], "No usage recorded yet.",
+                 cells={**feature, **mono,
+                        "calls_in_window": lambda e: escape(_num(e["calls_in_window"])),
+                        "candidate": lambda e: _census_status(e, protected)},
+                 classes={"calls_in_window": "num", "days_silent": "num"})
         + "<footer>Every number is measured by a CI job and links to it. Usage history in this demo is "
         "simulated and labelled as such in the census.</footer>"
         "</main>"

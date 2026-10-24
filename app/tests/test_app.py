@@ -89,3 +89,11 @@ def test_home_page_lists_books_and_links_graveyard(client, store):
     assert "The Pragmatic Programmer" in response.text and "/graveyard" in response.text
     # The front page is not a feature, so it is never counted.
     assert all(not store.daily_counts(f) for f in ("books_v1", "books_v2"))
+
+
+def test_home_page_counts_the_graveyard():
+    from app.home import render
+
+    ledger = {"retired": [{"feature": "books_v1"}], "hibernating": [], "resurrected": [], "protected": []}
+    html = render([{"title": "Dune", "author": "Frank Herbert", "status": "reading"}], ledger)
+    assert "<dt>1</dt><dd>retired</dd>" in html and "pill reading" in html

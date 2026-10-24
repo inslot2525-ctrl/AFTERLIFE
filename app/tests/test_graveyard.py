@@ -86,3 +86,22 @@ def test_page_shows_census_and_obituary_link():
     html = render(LEDGER, savings, census, 30)
     assert "Calls, last 30 days" in html and "2026-04-06" in html
     assert "issues/1'>Obituary" in html
+
+
+def test_totals_show_megabytes_with_one_decimal():
+    html = render(LEDGER, {"import_goodreads": {**SAVINGS["import_goodreads"], "image_mb_saved": 0.6}})
+    assert "<b>0.6</b>" in html and "0.6000" not in html
+    assert "<b>0.0123</b>" in html
+
+
+def test_census_marks_protected_features_and_formats_knock_times():
+    census = [{"feature": "admin_reindex", "route": "/admin/reindex", "calls_in_window": 0,
+               "last_seen": "2025-12-30", "days_silent": 300, "candidate": "yes"},
+              {"feature": "books_v2", "route": "/v2/books", "calls_in_window": 3218,
+               "last_seen": "2026-10-26", "days_silent": 0, "candidate": "no"}]
+    ledger = {**LEDGER, "resurrected": [{"feature": "embed_widget", "caller": "acme",
+                                         "knocked_at": "2026-10-26T12:03:00Z", "reason": "partner", "recheck": "2027-01-26"}]}
+    html = render(ledger, {}, census, 30)
+    assert "pill protected'>protected" in html and "pill candidate" not in html
+    assert "3,218" in html and "pill alive'>in use" in html
+    assert "2026-10-26 12:03 UTC" in html

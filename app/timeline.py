@@ -149,7 +149,7 @@ def cached_timeline(fetch: Fetch = gitlab_fetch) -> tuple[list[dict], str | None
 
 
 STYLE = """
-.timeline { display: grid; gap: 14px; }
+.timeline { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .retirement { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
 .retirement header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
   flex-wrap: wrap; margin-bottom: 12px; }
