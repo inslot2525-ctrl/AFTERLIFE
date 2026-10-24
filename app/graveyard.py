@@ -161,7 +161,7 @@ def _total(label: str, value, digits: int = 1, good: bool = False) -> str:
 
 def nav(current: str) -> str:
     """The bar shared by Shelf's pages, so the video can move between them."""
-    links = [("Reading list", "/"), ("Graveyard", "/graveyard"), ("Partner demo", "/partner")]
+    links = [("Reading list", "/"), ("Graveyard", "/graveyard")]
     items = "".join(
         f"<a href='{href}'{' aria-current=\"page\"' if label == current else ''}>{label}</a>"
         for label, href in links

@@ -93,3 +93,9 @@ def test_orphan_files_must_be_in_the_verdict(policy):
     verdict["files"] = ["app/features/import_goodreads.py"]
     problems = check([verdict], census, policy, changes)
     assert any("orphan app/catalog.py:add_books" in p for p in problems)
+
+
+def test_mr_cannot_edit_the_pipeline(policy):
+    census = {"features": [signals("books_v1")]}
+    problems = check([dead("books_v1", V1_FILES)], census, policy, V1_CHANGES + [".gitlab-ci.yml"])
+    assert any(".gitlab-ci.yml" in p for p in problems)

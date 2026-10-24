@@ -30,6 +30,8 @@ protected_paths:
   - ci/
   - flows/
   - infra/
+  - .gitlab-ci.yml       # the pipeline that judges a Sunset MR
+  - partner-site/        # the demo partner's own site, not Shelf's code
 
 # Files a Sunset MR may touch besides the retired feature's own files.
 allowed_collateral:

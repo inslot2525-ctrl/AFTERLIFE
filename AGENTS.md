@@ -21,8 +21,3 @@ the hard ones, so breaking them fails the pipeline anyway.
 7. **Machine-readable verdicts.** End every verdict with a fenced
    `afterlife-verdict` JSON block. CI parses it; prose alone does not count.
 8. **You do not merge, release or deploy.** Deterministic CI jobs do that.
-9. **`app/partner.py` is outside traffic, not a caller.** It stands in for a
-   partner's website on the demo: its requests to `/embed/widget` are external
-   HTTP traffic, counted by the census and heard by the vigil like any other.
-   Don't count it as code that calls a feature, and don't edit it when retiring
-   one; it shows a "retired" message when the route is gone.
