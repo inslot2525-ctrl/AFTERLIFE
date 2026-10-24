@@ -67,3 +67,11 @@ def test_partner_widget_fades_out_instead_of_stopping(census):
     months = list(census["embed_widget"]["monthly_calls"].values())
     steady, fading, last = max(months), months[-2], months[-1]
     assert 0 < last < fading < steady / 2
+
+
+def test_census_reports_how_long_usage_has_been_recorded():
+    store = InMemoryStore()
+    assert build_census(PLANTED_FEATURES, store, load_policy(), TODAY)["history_days"] == 0
+    seed(store, TODAY)
+    report = build_census(PLANTED_FEATURES, store, load_policy(), TODAY)
+    assert report["history_days"] == 399 and report["observed_since"] == "2025-09-20"

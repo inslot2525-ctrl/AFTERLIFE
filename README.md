@@ -87,6 +87,12 @@ docs/         sci.md, runbook-om.md
 AGENTS.md     rules every agent follows
 ```
 
+## Use it in your own project
+
+**[docs/adopt.md](docs/adopt.md)** walks through adoption in six steps: put features behind the gate, create the
+flags, add the pipelines and flows, then watch. AFTERLIFE refuses any DEAD verdict until `min_history_days` of usage
+has been recorded, so a new adopter can't lose a feature to missing data.
+
 ## Set up
 
 1. **Flows:** in GitLab, go to **AI > Flows > New flow**, paste each file from `flows/`, enable it for the group and

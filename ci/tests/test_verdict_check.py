@@ -99,3 +99,13 @@ def test_mr_cannot_edit_the_pipeline(policy):
     census = {"features": [signals("books_v1")]}
     problems = check([dead("books_v1", V1_FILES)], census, policy, V1_CHANGES + [".gitlab-ci.yml"])
     assert any(".gitlab-ci.yml" in p for p in problems)
+
+
+def test_new_adopters_watch_before_anything_is_dead(policy):
+    # Just adopted: every feature is "never called" only because nobody was watching yet.
+    census = {"history_days": 3, "features": [signals("books_v1", days_silent=None)]}
+    problems = check([dead("books_v1", V1_FILES)], census, policy, V1_CHANGES)
+    assert any("days of usage recorded" in p for p in problems)
+
+    census["history_days"] = policy["min_history_days"]
+    assert check([dead("books_v1", V1_FILES)], census, policy, V1_CHANGES) == []

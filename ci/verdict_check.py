@@ -76,6 +76,12 @@ def check(verdicts: list[dict], census: dict, policy: dict, changed_files: list[
     if changed_files and not dead_files:
         problems.append("MR changes files but carries no DEAD verdict")
 
+    # Observation period: no DEAD verdict until usage has been recorded long enough.
+    # (A census from before history_days existed carries no value and is not held back.)
+    history, needed = census.get("history_days"), policy.get("min_history_days", 0)
+    if dead_files and history is not None and history < needed:
+        problems.append(f"only {history} days of usage recorded; policy needs {needed} before anything is DEAD")
+
     for path in changed_files:
         path = path.replace("\\", "/")
         if is_allowed_collateral(path, policy):

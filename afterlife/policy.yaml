@@ -4,6 +4,7 @@
 
 census_window_days: 30     # a candidate has zero calls in this window
 min_silence_days: 30       # days since the last call before DEAD is allowed
+min_history_days: 30       # days of recorded usage before anything can be DEAD (new adopters watch first)
 lookback_days: 400         # history the census reports, long enough to see a December
 
 seasonal:

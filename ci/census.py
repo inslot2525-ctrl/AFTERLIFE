@@ -94,14 +94,22 @@ def build_census(
 ) -> dict:
     static_findings = static_findings or {}
     entries = []
+    first_day = None
     for feature in features:
         signals = feature_signals(feature, store, policy, today)
         signals["static_unused"] = static_findings.get(feature.module, [])
         entries.append(signals)
+        days = [day for day in store.daily_counts(feature.name) if day <= today]
+        if days and (first_day is None or min(days) < first_day):
+            first_day = min(days)
     return {
         "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "today": today.isoformat(),
         "window_days": policy["census_window_days"],
+        # How long usage has been recorded at all. A project that just adopted
+        # AFTERLIFE has none, and "never called" then means "not watched yet".
+        "observed_since": first_day.isoformat() if first_day else None,
+        "history_days": (today - first_day).days if first_day else 0,
         "features": entries,
     }
 

@@ -155,6 +155,11 @@ prompts:
         If that is your only remaining doubt, say so in the certificate and choose DEAD;
         use INSUFFICIENT_EVIDENCE when the census numbers themselves don't add up.
 
+        Observation period: the census reports history_days, how long usage has been
+        recorded at all. If it is below policy min_history_days, the project has only
+        just started watching, so "never called" means "not watched yet": every verdict
+        is INSUFFICIENT_EVIDENCE, and the note says when the observation period ends.
+
         For every feature whose `candidate` is true, pick exactly one verdict:
         - DEAD: zero calls in the window, silent at least min_silence_days (or never
           called), not seasonal_suspect, not protected, no callers in other code, and
