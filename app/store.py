@@ -18,7 +18,7 @@ from typing import Protocol
 class UsageStore(Protocol):
     def record_hit(self, feature: str, day: dt.date, n: int = 1, simulated: bool = False) -> None: ...
 
-    def record_knock(self, feature: str, caller: str, at: dt.datetime) -> None: ...
+    def record_knock(self, feature: str, caller: str, at: dt.datetime, user_agent: str = "") -> None: ...
 
     def daily_counts(self, feature: str) -> dict[dt.date, dict[str, int]]: ...
 
@@ -41,8 +41,8 @@ class InMemoryStore:
         if simulated:
             row["simulated"] += n
 
-    def record_knock(self, feature: str, caller: str, at: dt.datetime) -> None:
-        self._knocks.append({"feature": feature, "caller": caller, "at": at.isoformat()})
+    def record_knock(self, feature: str, caller: str, at: dt.datetime, user_agent: str = "") -> None:
+        self._knocks.append({"feature": feature, "caller": caller, "user_agent": user_agent, "at": at.isoformat()})
 
     def daily_counts(self, feature: str) -> dict[dt.date, dict[str, int]]:
         return {day: dict(row) for day, row in self._days[feature].items()}
@@ -88,8 +88,8 @@ class JsonFileStore(InMemoryStore):
         super().record_hit(feature, day, n, simulated)
         self._save()
 
-    def record_knock(self, feature: str, caller: str, at: dt.datetime) -> None:
-        super().record_knock(feature, caller, at)
+    def record_knock(self, feature: str, caller: str, at: dt.datetime, user_agent: str = "") -> None:
+        super().record_knock(feature, caller, at, user_agent)
         self._save()
 
     def record_savings(self, feature: str, savings: dict) -> None:
@@ -116,8 +116,10 @@ class FirestoreStore:
             .set(update, merge=True)
         )
 
-    def record_knock(self, feature: str, caller: str, at: dt.datetime) -> None:
-        self._db.collection("knocks").add({"feature": feature, "caller": caller, "at": at.isoformat()})
+    def record_knock(self, feature: str, caller: str, at: dt.datetime, user_agent: str = "") -> None:
+        self._db.collection("knocks").add(
+            {"feature": feature, "caller": caller, "user_agent": user_agent, "at": at.isoformat()}
+        )
 
     def daily_counts(self, feature: str) -> dict[dt.date, dict[str, int]]:
         days = self._db.collection("usage").document(feature).collection("days").stream()

@@ -36,6 +36,7 @@ def test_flag_off_returns_410_and_logs_knock(client, store, flags):
     assert response.status_code == 410
     knocks = store.knocks("embed_widget", since=dt.datetime(2000, 1, 1, tzinfo=dt.timezone.utc))
     assert [k["caller"] for k in knocks] == ["acme"]
+    assert knocks[0]["user_agent"] == "testclient"
     assert store.daily_counts("embed_widget") == {}
 
 
@@ -71,3 +72,20 @@ def test_graveyard_lists_protected_feature(client):
     response = client.get("/graveyard")
     assert response.status_code == 200
     assert "admin_reindex" in response.text
+
+
+def test_graveyard_census_reflects_live_calls(client):
+    import app.graveyard as graveyard
+
+    graveyard._census_cache["at"] = 0.0
+    client.get("/v2/books")
+    response = client.get("/graveyard")
+    assert "Census" in response.text and "/v2/books" in response.text
+
+
+def test_home_page_lists_books_and_links_graveyard(client, store):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "The Pragmatic Programmer" in response.text and "/graveyard" in response.text
+    # The front page is not a feature, so it is never counted.
+    assert all(not store.daily_counts(f) for f in ("books_v1", "books_v2"))

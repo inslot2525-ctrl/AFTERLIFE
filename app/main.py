@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from app import graveyard
+from app import graveyard, home
 from app.features import MODULES
 from app.flags import Flags, flags_from_env
 from app.store import UsageStore, store_from_env
@@ -16,6 +16,7 @@ def create_app(store: UsageStore | None = None, flags: Flags | None = None) -> F
     for module in MODULES:
         app.include_router(module.router)
     app.include_router(graveyard.router)
+    app.include_router(home.router)
 
     @app.get("/healthz")
     def healthz() -> dict:

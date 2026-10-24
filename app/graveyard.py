@@ -5,7 +5,9 @@ Measured savings come from the store (published by CI after release), so a
 tombstone without savings says so instead of showing a number nobody measured.
 """
 
+import datetime as dt
 import os
+import time
 from html import escape
 from pathlib import Path
 
@@ -13,7 +15,15 @@ import yaml
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from app.features import FEATURES
+from app.registry import Feature
+from app.store import UsageStore
+
 DEFAULT_LEDGER = Path(__file__).resolve().parent.parent / "afterlife" / "graveyard.yaml"
+DEFAULT_POLICY = Path(__file__).resolve().parent.parent / "afterlife" / "policy.yaml"
+# Reading every feature's daily counts costs Firestore reads, so the census
+# section is reused for a few minutes instead of rebuilt on each page view.
+CENSUS_TTL_SECONDS = 300
 
 router = APIRouter()
 
@@ -69,6 +79,43 @@ def load_ledger(path: Path | None = None) -> dict:
     return {key: data.get(key) or [] for key in ("retired", "hibernating", "resurrected", "protected")}
 
 
+def census_rows(features: list[Feature], store: UsageStore, window_days: int, today: dt.date) -> list[dict]:
+    """The live candidate list: calls in the census window and days since the last call."""
+    window_start = today - dt.timedelta(days=window_days)
+    rows = []
+    for feature in features:
+        counts = store.daily_counts(feature.name)
+        seen = [day for day, row in counts.items() if row["count"] > 0 and day <= today]
+        last_seen = max(seen) if seen else None
+        calls = sum(row["count"] for day, row in counts.items() if window_start < day <= today)
+        rows.append({
+            "feature": feature.name,
+            "route": feature.route,
+            "calls_in_window": calls,
+            "last_seen": last_seen.isoformat() if last_seen else "never",
+            "days_silent": (today - last_seen).days if last_seen else "never called",
+            "candidate": "yes" if calls == 0 else "no",
+        })
+    # Quietest first: those are the ones the Coroner will look at.
+    return sorted(rows, key=lambda r: (r["candidate"] != "yes", r["calls_in_window"]))
+
+
+_census_cache: dict = {"at": 0.0, "store": None, "rows": None}
+
+
+def cached_census(store: UsageStore, window_days: int) -> list[dict]:
+    fresh = time.monotonic() - _census_cache["at"] < CENSUS_TTL_SECONDS
+    if not (fresh and _census_cache["store"] is store):
+        today = dt.datetime.now(dt.timezone.utc).date()
+        _census_cache.update(at=time.monotonic(), store=store,
+                             rows=census_rows(FEATURES, store, window_days, today))
+    return _census_cache["rows"]
+
+
+def census_window_days(path: Path = DEFAULT_POLICY) -> int:
+    return int((yaml.safe_load(path.read_text()) or {}).get("census_window_days", 30))
+
+
 def _num(value, digits: int = 1) -> str:
     if isinstance(value, float):
         return f"{value:,.{digits}f}"
@@ -113,7 +160,7 @@ def _chips(s: dict) -> str:
 
 def _links(tomb: dict, s: dict) -> str:
     links = [("Sunset MR", s.get("mr_url") or tomb.get("mr")), ("Release", s.get("release_url")),
-             ("Measured by", s.get("measured_job_url"))]
+             ("Obituary", s.get("obituary_url")), ("Measured by", s.get("measured_job_url"))]
     return "".join(f"<a href='{escape(str(url))}'>{escape(label)}</a>" for label, url in links if url)
 
 
@@ -143,7 +190,8 @@ def _table(entries: list[dict], columns: list[tuple[str, str]], empty: str) -> s
     return f"<div class='scroll'><table><tr>{head}</tr>{rows}</table></div>"
 
 
-def render(ledger: dict, savings: dict[str, dict]) -> str:
+def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = None,
+           window_days: int = 30) -> str:
     t = totals(ledger["retired"], savings)
     stones = ("".join(_stone(tomb, savings) for tomb in ledger["retired"])
               or "<p class='empty'>Nothing retired yet.</p>")
@@ -172,6 +220,13 @@ def render(ledger: dict, savings: dict[str, dict]) -> str:
                  "Nobody has knocked yet.")
         + "<h2>Protected</h2>"
         + _table(ledger["protected"], [("Feature", "feature"), ("Reason", "reason")], "No protected features.")
+        + "<h2>Census</h2>"
+        + f"<p class='lead'>Every live feature, quietest first. A feature with no calls in the last "
+        f"{window_days} days is a candidate; the Coroner decides whether it is really dead.</p>"
+        + _table(census or [], [("Feature", "feature"), ("Route", "route"),
+                                (f"Calls, last {window_days} days", "calls_in_window"),
+                                ("Last call", "last_seen"), ("Days silent", "days_silent"),
+                                ("Candidate", "candidate")], "No usage recorded yet.")
         + "<footer>Every number is measured by a CI job and links to it. Usage history in this demo is "
         "simulated and labelled as such in the census.</footer>"
         "</main></body></html>"
@@ -180,4 +235,6 @@ def render(ledger: dict, savings: dict[str, dict]) -> str:
 
 @router.get("/graveyard", response_class=HTMLResponse)
 def graveyard(request: Request) -> str:
-    return render(load_ledger(), request.app.state.store.all_savings())
+    store = request.app.state.store
+    window = census_window_days()
+    return render(load_ledger(), store.all_savings(), cached_census(store, window), window)

@@ -10,8 +10,9 @@ def feature_gate(feature: str):
         state = request.app.state
         now = dt.datetime.now(dt.timezone.utc)
         if not state.flags.is_enabled(feature):
-            caller = request.headers.get("x-partner-key") or request.headers.get("user-agent", "unknown")
-            state.store.record_knock(feature, caller, now)
+            user_agent = request.headers.get("user-agent", "unknown")
+            caller = request.headers.get("x-partner-key") or user_agent
+            state.store.record_knock(feature, caller, now, user_agent=user_agent)
             raise HTTPException(
                 status_code=410,
                 detail=f"'{feature}' is being retired. This request was logged; if you still need it, it will come back.",

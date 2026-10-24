@@ -56,3 +56,33 @@ def test_json_store_keeps_savings(tmp_path):
     path = tmp_path / "store.json"
     JsonFileStore(path).record_savings("books_v1", {"feature": "books_v1", "lines_removed": 20})
     assert JsonFileStore(path).all_savings() == {"books_v1": {"feature": "books_v1", "lines_removed": 20}}
+
+
+def test_census_rows_put_silent_features_first():
+    import datetime as dt
+
+    from app.features import FEATURES
+    from app.graveyard import census_rows
+    from app.store import InMemoryStore
+
+    today = dt.date(2026, 10, 24)
+    store = InMemoryStore()
+    store.record_hit("books_v2", today, 5)
+    store.record_hit("books_v1", today - dt.timedelta(days=200), 3)
+    rows = {r["feature"]: r for r in census_rows(FEATURES, store, 30, today)}
+
+    assert rows["books_v2"] == {"feature": "books_v2", "route": "/v2/books", "calls_in_window": 5,
+                                     "last_seen": "2026-10-24", "days_silent": 0, "candidate": "no"}
+    assert rows["books_v1"]["days_silent"] == 200 and rows["books_v1"]["candidate"] == "yes"
+    assert rows["import_goodreads"]["last_seen"] == "never"
+    ordered = [r["feature"] for r in census_rows(FEATURES, store, 30, today)]
+    assert ordered[-1] == "books_v2"
+
+
+def test_page_shows_census_and_obituary_link():
+    savings = {"import_goodreads": {**SAVINGS["import_goodreads"], "obituary_url": "https://gitlab.com/x/-/issues/1"}}
+    census = [{"feature": "books_v1", "route": "/v1/books", "calls_in_window": 0, "last_seen": "2026-04-06",
+               "days_silent": 201, "candidate": "yes"}]
+    html = render(LEDGER, savings, census, 30)
+    assert "Calls, last 30 days" in html and "2026-04-06" in html
+    assert "issues/1'>Obituary" in html
