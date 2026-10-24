@@ -1,0 +1,12 @@
+# The ledger. The Undertaker adds a tombstone in each Sunset MR; CI adds the
+# measured savings after release. Every number here links back to a job.
+
+retired: []
+
+hibernating: []
+
+resurrected: []
+
+protected:
+  - feature: admin_reindex
+    reason: Admin path, listed in protected_paths

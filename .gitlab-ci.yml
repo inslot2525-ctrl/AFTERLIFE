@@ -1,0 +1,74 @@
+# AFTERLIFE pipeline. This is the first slice: test, secure, build.
+# Still to add (see the build plan): census schedule, verdict-check, coma,
+# vigil, resurrect, gate-merge, release, deploy-canary, canary-watch,
+# promote/rollback, measure, obituary.
+
+stages:
+  - test
+  - secure
+  - build
+
+default:
+  image: python:3.12-slim
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  key: pip
+  paths:
+    - .cache/pip
+
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+
+.python:
+  before_script:
+    - pip install -r requirements.txt -r requirements-dev.txt
+
+test:
+  extends: .python
+  stage: test
+  script:
+    - pytest --junitxml=report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+
+vulture:
+  extends: .python
+  stage: test
+  script:
+    - vulture app/ --min-confidence 80 --exclude app/tests
+
+dependency-audit:
+  extends: .python
+  stage: secure
+  script:
+    # Reports, never blocks: requests is pinned to a vulnerable version on
+    # purpose, and retiring the Goodreads importer is what removes it.
+    - pip-audit -r requirements.txt -f json -o pip-audit.json || true
+    - pip-audit -r requirements.txt || true
+  artifacts:
+    when: always
+    paths:
+      - pip-audit.json
+
+build-image:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" .
+    - docker image inspect "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" --format '{{.Size}}' > image-size.txt
+    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+  artifacts:
+    paths:
+      - image-size.txt

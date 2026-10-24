@@ -1,0 +1,11 @@
+.git
+.venv
+**/__pycache__
+app/tests
+ci
+flows
+infra
+scripts
+docs
+census
+*.local.json

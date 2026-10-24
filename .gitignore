@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.cache/
+census/
+vigil.json
+pip-audit.json
+report.xml
+*.local.json
+.terraform/
+*.tfstate*

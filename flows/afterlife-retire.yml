@@ -1,0 +1,55 @@
+# AFTERLIFE retire flow: Coroner -> Undertaker -> Reviewer.
+# Trigger: work item created (the census issue). Fallback: mention.
+#
+# SKELETON. The schema page confirms the top-level keys and the from/as input
+# form, but not the tool names or how one component reads another's output.
+# Copy both from a GitLab foundational flow YAML before enabling this flow.
+# Prompts live in flows/prompts/*.md; paste them into the prompts section.
+
+version: "v1"
+environment: ambient
+
+components:
+  - name: coroner
+    type: AgentComponent
+    prompt_id: coroner
+    inputs:
+      - from: "context:goal"
+        as: goal
+      - from: "context:project_id"
+        as: project_id
+    # toolset: [read_file, get_issue, create_issue_note, query_graph]  # TODO: verify names
+
+  - name: undertaker
+    type: AgentComponent
+    prompt_id: undertaker
+    inputs:
+      - "context:goal"
+      # TODO: add the coroner's output (verify the reference syntax)
+    # toolset: [read_file, edit_file, create_branch, create_commit, create_merge_request]  # TODO: verify
+
+  - name: reviewer
+    type: AgentComponent
+    prompt_id: reviewer
+    inputs:
+      - "context:goal"
+    # toolset: [get_merge_request_diff, create_merge_request_note]  # TODO: verify
+
+prompts:
+  - prompt_id: coroner
+    # TODO: system/user templates from flows/prompts/coroner.md
+  - prompt_id: undertaker
+    # TODO: from flows/prompts/undertaker.md
+  - prompt_id: reviewer
+    # TODO: from flows/prompts/reviewer.md
+
+routers:
+  - from: coroner
+    to: undertaker
+  - from: undertaker
+    to: reviewer
+  - from: reviewer
+    to: end
+
+flow:
+  entry_point: coroner

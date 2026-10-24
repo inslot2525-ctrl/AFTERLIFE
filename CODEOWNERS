@@ -1,0 +1,8 @@
+# GitLab CODEOWNERS. Uncomment once the team's GitLab usernames are known,
+# and require Code Owner approval on the default branch.
+#
+# /afterlife/policy.yaml  @<aditya> @<om> @<ayush>
+# /ci/                    @<om>
+# /flows/                 @<aditya>
+# /infra/                 @<om>
+# /CODEOWNERS             @<aditya> @<om> @<ayush>

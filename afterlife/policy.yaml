@@ -1,0 +1,42 @@
+# AFTERLIFE policy. CI reads this file from the target branch, never from the
+# MR under review, so a Sunset MR cannot loosen the rules that judge it.
+# Agents must not edit it (see CODEOWNERS and AGENTS.md).
+
+census_window_days: 30     # a candidate has zero calls in this window
+min_silence_days: 30       # days since the last call before DEAD is allowed
+lookback_days: 400         # history the census reports, long enough to see a December
+
+seasonal:
+  max_active_months: 2     # usage confined to this few months looks seasonal
+  min_peak_calls: 20       # ...if the busiest month had at least this many calls
+
+min_confidence: 0.8        # Coroner confidence required for DEAD
+
+vigil_minutes: 10          # demo value; 10080 (7 days) for a real service
+
+canary:
+  traffic_percent: 10
+  watch_minutes: 5
+  max_5xx_rate: 0.01
+
+# Never auto-retired. A trailing slash means the whole directory.
+protected_paths:
+  - app/features/admin_reindex.py
+  - app/main.py
+  - app/gate.py
+  - app/flags.py
+  - app/store.py
+  - afterlife/
+  - ci/
+  - flows/
+  - infra/
+
+# Files a Sunset MR may touch besides the retired feature's own files.
+allowed_collateral:
+  - app/features/__init__.py
+  - app/tests/
+  - afterlife/graveyard.yaml
+  - requirements.txt
+
+# Features that need a CODEOWNERS approval before gate-merge (supervised).
+requires_approval: []

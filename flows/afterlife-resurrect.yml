@@ -1,0 +1,28 @@
+# AFTERLIFE resurrect flow: the Medium explains who still needs a feature.
+# Trigger: CI calls the Flows API after a knock (if the day-1 check shows that
+# works), otherwise a human mentions the service account on the closed MR.
+#
+# SKELETON: same caveats as afterlife-retire.yml.
+
+version: "v1"
+environment: ambient
+
+components:
+  - name: medium
+    type: AgentComponent
+    prompt_id: medium
+    inputs:
+      - from: "context:goal"
+        as: goal
+    # toolset: [read_file, get_merge_request, create_merge_request_note, create_branch, create_commit, create_merge_request]  # TODO: verify
+
+prompts:
+  - prompt_id: medium
+    # TODO: from flows/prompts/medium.md
+
+routers:
+  - from: medium
+    to: end
+
+flow:
+  entry_point: medium
