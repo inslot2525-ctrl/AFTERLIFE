@@ -36,6 +36,7 @@ resource "google_iam_workload_identity_pool_provider" "gitlab" {
 resource "google_service_account" "deploy" {
   account_id   = "afterlife-deploy"
   display_name = "AFTERLIFE CI deploy"
+  depends_on   = [google_project_service.apis] # IAM API must be on first
 }
 
 resource "google_project_iam_member" "deploy" {
@@ -68,6 +69,7 @@ resource "google_service_account_iam_member" "gitlab_impersonates_deploy" {
 resource "google_service_account" "plan" {
   account_id   = "afterlife-tf-plan"
   display_name = "AFTERLIFE terraform plan (read-only)"
+  depends_on   = [google_project_service.apis] # IAM API must be on first
 }
 
 resource "google_project_iam_member" "plan" {

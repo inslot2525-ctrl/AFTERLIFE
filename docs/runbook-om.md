@@ -3,6 +3,21 @@
 What exists, what still needs a human with accounts, and how to run Om's Day-1 spikes.
 Post each spike result in team chat as yes/no plus a link.
 
+## Live setup (Oct 25, 2026)
+
+| Thing | Value |
+| --- | --- |
+| GCP project | `project-52f411a4-f688-4521-bbc` (number 246401536067), on Om's free-trial billing account |
+| Region | `europe-north1` |
+| Cloud Run | `https://shelf-i6y2wbu2yq-lz.a.run.app` |
+| Budget alert | `afterlife-guard`, ₹2,000, gross usage (before credits), alerts at 25/50/90/100% |
+| Terraform state | Om's Cloud Shell, `~/AFTERLIFE/infra/terraform.tfstate`, via a local `backend_override.tf`. Move it to GitLab-managed state before running `terraform-plan` on an MR. |
+| Firestore | Seeded with `scripts/seed_history.py`; every call is marked simulated |
+| GitLab | Both flows enabled. CI variables set: `AFTERLIFE_TOKEN`, `AFTERLIFE_AGENT_USERNAME`, all GCP ones |
+
+Terraform isn't preinstalled in Cloud Shell any more; install it from `apt.releases.hashicorp.com`.
+Trial accounts have a small project quota, so the trial's own "My First Project" is used.
+
 ## What's in the repo
 
 | Path | What |

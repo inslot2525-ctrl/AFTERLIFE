@@ -56,6 +56,7 @@ resource "google_firestore_database" "default" {
 resource "google_service_account" "runtime" {
   account_id   = "shelf-runtime"
   display_name = "Shelf Cloud Run runtime"
+  depends_on   = [google_project_service.apis] # IAM API must be on first
 }
 
 resource "google_project_iam_member" "runtime_firestore" {
