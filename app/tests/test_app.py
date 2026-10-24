@@ -30,21 +30,23 @@ def test_calls_are_counted(client, store):
     assert store.daily_counts("books_v2")[today]["count"] == 2
 
 
+# Gate behaviour is tested on books_v2, the live API that is never a retirement
+# candidate: a test pinned to a retirable feature would be deleted with it.
 def test_flag_off_returns_410_and_logs_knock(client, store, flags):
-    flags.set("embed_widget", False)
-    response = client.get("/embed/widget", headers={"x-partner-key": "acme"})
+    flags.set("books_v2", False)
+    response = client.get("/v2/books", headers={"x-partner-key": "acme"})
     assert response.status_code == 410
-    knocks = store.knocks("embed_widget", since=dt.datetime(2000, 1, 1, tzinfo=dt.timezone.utc))
+    knocks = store.knocks("books_v2", since=dt.datetime(2000, 1, 1, tzinfo=dt.timezone.utc))
     assert [k["caller"] for k in knocks] == ["acme"]
     assert knocks[0]["user_agent"] == "testclient"
-    assert store.daily_counts("embed_widget") == {}
+    assert store.daily_counts("books_v2") == {}
 
 
 def test_flag_back_on_restores_feature(client, flags):
-    flags.set("books_v1", False)
-    assert client.get("/v1/books").status_code == 410
-    flags.set("books_v1", True)
-    assert client.get("/v1/books").status_code == 200
+    flags.set("books_v2", False)
+    assert client.get("/v2/books").status_code == 410
+    flags.set("books_v2", True)
+    assert client.get("/v2/books").status_code == 200
 
 
 def test_health_answers_on_a_path_cloud_run_does_not_reserve(client):
