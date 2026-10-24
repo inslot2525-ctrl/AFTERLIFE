@@ -16,3 +16,5 @@ infra/terraform.tfvars
 *.local.md
 *.local.py
 .ref.local/
+*.local.yaml
+*.local.log

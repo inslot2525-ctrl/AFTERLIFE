@@ -125,9 +125,11 @@ measure:
       - runner_minutes.json
 
 obituary:
-  extends: [.gate, .retirement]
+  extends: [.gate-gcp, .retirement]
   stage: measure
   needs: [measure, release-notes]
   script:
     - export RELEASE_URL="$CI_PROJECT_URL/-/releases/$RELEASE_TAG"
     - python -m ci.obituary --savings savings.json
+    # Firestore, so the live /graveyard page shows the measured numbers.
+    - python -m ci.publish_savings --savings savings.json

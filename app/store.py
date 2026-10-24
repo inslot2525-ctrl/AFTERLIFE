@@ -1,7 +1,8 @@
-"""Usage storage: per-feature daily call counts and the knock log.
+"""Usage storage: per-feature daily call counts, the knock log, and savings.
 
 A knock is a request to a feature whose flag is off. During a vigil, one knock
-is enough to resurrect the feature.
+is enough to resurrect the feature. Savings are the measured results CI's
+measure job publishes after a retirement ships; /graveyard shows them.
 """
 
 from __future__ import annotations
@@ -23,11 +24,16 @@ class UsageStore(Protocol):
 
     def knocks(self, feature: str, since: dt.datetime) -> list[dict]: ...
 
+    def record_savings(self, feature: str, savings: dict) -> None: ...
+
+    def all_savings(self) -> dict[str, dict]: ...
+
 
 class InMemoryStore:
     def __init__(self) -> None:
         self._days: dict[str, dict[dt.date, dict[str, int]]] = defaultdict(dict)
         self._knocks: list[dict] = []
+        self._savings: dict[str, dict] = {}
 
     def record_hit(self, feature: str, day: dt.date, n: int = 1, simulated: bool = False) -> None:
         row = self._days[feature].setdefault(day, {"count": 0, "simulated": 0})
@@ -47,6 +53,12 @@ class InMemoryStore:
             if k["feature"] == feature and dt.datetime.fromisoformat(k["at"]) >= since
         ]
 
+    def record_savings(self, feature: str, savings: dict) -> None:
+        self._savings[feature] = savings
+
+    def all_savings(self) -> dict[str, dict]:
+        return dict(self._savings)
+
 
 class JsonFileStore(InMemoryStore):
     """Local development store that survives restarts. Not for production."""
@@ -59,6 +71,7 @@ class JsonFileStore(InMemoryStore):
             for feature, days in data["days"].items():
                 self._days[feature] = {dt.date.fromisoformat(d): row for d, row in days.items()}
             self._knocks = data["knocks"]
+            self._savings = data.get("savings", {})
 
     def _save(self) -> None:
         data = {
@@ -67,6 +80,7 @@ class JsonFileStore(InMemoryStore):
                 for feature, days in self._days.items()
             },
             "knocks": self._knocks,
+            "savings": self._savings,
         }
         self._path.write_text(json.dumps(data))
 
@@ -76,6 +90,10 @@ class JsonFileStore(InMemoryStore):
 
     def record_knock(self, feature: str, caller: str, at: dt.datetime) -> None:
         super().record_knock(feature, caller, at)
+        self._save()
+
+    def record_savings(self, feature: str, savings: dict) -> None:
+        super().record_savings(feature, savings)
         self._save()
 
 
@@ -121,6 +139,12 @@ class FirestoreStore:
             doc.to_dict() for doc in docs
             if dt.datetime.fromisoformat(doc.to_dict()["at"]) >= since
         ]
+
+    def record_savings(self, feature: str, savings: dict) -> None:
+        self._db.collection("savings").document(feature).set(savings)
+
+    def all_savings(self) -> dict[str, dict]:
+        return {doc.id: doc.to_dict() for doc in self._db.collection("savings").stream()}
 
 
 def store_from_env() -> UsageStore:
