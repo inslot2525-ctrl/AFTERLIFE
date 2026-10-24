@@ -24,14 +24,15 @@ deploy-canary:
   script:
     - |
       describe() { gcloud run services describe "$SERVICE" --region "$GCP_REGION" --format=json; }
-      PREV=$(describe | python3 -c "import json,sys; t=json.load(sys.stdin)['status']['traffic']; print(max(t, key=lambda x: x.get('percent', 0))['revisionName'])")
+      # One tag per pipeline: overlapping pipelines must not move each other's canary.
+      TAG="c-$CI_PIPELINE_IID"
       gcloud run deploy "$SERVICE" --region "$GCP_REGION" --image "$AR_REPO/$SERVICE:$CI_COMMIT_SHA" \
-        --no-traffic --tag canary --quiet
+        --no-traffic --tag "$TAG" --quiet
       REV=$(describe | python3 -c "import json,sys; print(json.load(sys.stdin)['status']['latestCreatedRevisionName'])")
-      URL=$(describe | python3 -c "import json,sys; print(next(t['url'] for t in json.load(sys.stdin)['status']['traffic'] if t.get('tag') == 'canary'))")
+      URL=$(describe | python3 -m ci.cloudrun tag-url --tag "$TAG")
       # Keep in step with policy canary.traffic_percent.
       gcloud run services update-traffic "$SERVICE" --region "$GCP_REGION" --to-revisions "$REV=${CANARY_PERCENT:-10}" --quiet
-      printf 'PREV_REVISION=%s\nCANARY_REVISION=%s\nCANARY_URL=%s\n' "$PREV" "$REV" "$URL" | tee deploy.env
+      printf 'CANARY_TAG=%s\nCANARY_REVISION=%s\nCANARY_URL=%s\n' "$TAG" "$REV" "$URL" | tee deploy.env
   artifacts:
     reports:
       dotenv: deploy.env
@@ -58,9 +59,15 @@ promote:
   script:
     - |
       if [ "$CANARY_RESULT" != "promote" ]; then echo "Canary said $CANARY_RESULT; not promoting."; exit 0; fi
-      gcloud run services update-traffic "$SERVICE" --region "$GCP_REGION" --to-latest --quiet
-      gcloud run services update-traffic "$SERVICE" --region "$GCP_REGION" --remove-tags canary --quiet
-      echo "Promoted $CANARY_REVISION to 100%."
+      if python3 -m ci.cloudrun superseded; then
+        # A newer push is on its way to production; promoting this older revision would downgrade it.
+        echo "A newer main pipeline exists; it will promote. Leaving $CANARY_REVISION unpromoted."
+      else
+        # Promote exactly the revision that was watched, not whatever is latest by now.
+        gcloud run services update-traffic "$SERVICE" --region "$GCP_REGION" --to-revisions "$CANARY_REVISION=100" --quiet
+        echo "Promoted $CANARY_REVISION to 100%."
+      fi
+      gcloud run services update-traffic "$SERVICE" --region "$GCP_REGION" --remove-tags "$CANARY_TAG" --quiet
 
 rollback:
   extends: [.gcloud, .main]
@@ -70,7 +77,11 @@ rollback:
   script:
     - |
       if [ "$CANARY_RESULT" != "rollback" ]; then echo "Canary healthy; no rollback."; exit 0; fi
+      # Roll back to what serves traffic now, not a snapshot from before other pipelines moved it.
+      export PREV_REVISION=$(gcloud run services describe "$SERVICE" --region "$GCP_REGION" --format=json \
+        | python3 -m ci.cloudrun stable --exclude "$CANARY_REVISION")
       gcloud run services update-traffic "$SERVICE" --region "$GCP_REGION" --to-revisions "$PREV_REVISION=100" --quiet
+      gcloud run services update-traffic "$SERVICE" --region "$GCP_REGION" --remove-tags "$CANARY_TAG" --quiet
       python3 -m ci.rollback --canary canary.json
       # Fail the pipeline so release, measure and obituary never run for a rolled-back retirement.
       exit 1
