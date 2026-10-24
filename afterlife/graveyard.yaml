@@ -17,7 +17,13 @@ retired:
 
 hibernating: []
 
-resurrected: []
+resurrected:
+  - feature: embed_widget
+    route: /embed/widget
+    caller: acme-quarterly-report
+    knocked_at: "2026-10-24T20:42:52Z"
+    reason: "Knocked during the vigil by acme-quarterly-report; the DEAD verdict (0 calls in 30 days, silent 71 days) missed a caller the census window could not see. Flag restored by CI, MR !3 closed."
+    recheck: "2027-01-24"
 
 protected:
   - feature: admin_reindex
