@@ -110,3 +110,10 @@ def test_census_marks_protected_features_and_formats_knock_times():
 def test_image_total_is_a_dash_when_never_measured():
     unmeasured = {"import_goodreads": {**SAVINGS["import_goodreads"], "image_mb_saved": None}}
     assert totals(LEDGER["retired"], unmeasured)["image_mb_saved"] is None
+
+
+def test_tombstone_shows_measured_image_sizes_not_a_negative_saving():
+    grew = {"import_goodreads": {**SAVINGS["import_goodreads"], "image_mb_before": 70.5, "image_mb_after": 70.6,
+                                 "image_mb_saved": -0.2}}
+    html = render(LEDGER, grew)
+    assert "image 70.5 → 70.6 MB" in html and "-0.2 MB image saved" not in html

@@ -204,8 +204,10 @@ def _chips(s: dict) -> str:
         chips.append("deps: " + ", ".join(s["deps_removed"]))
     if s.get("cves_removed"):
         chips.append(f"{len(s['cves_removed'])} CVEs removed")
-    if s.get("image_mb_saved"):
-        chips.append(f"{_num(s['image_mb_saved'])} MB image saved")
+    # Show the measured sizes, not a "saved" figure: removing code can leave the
+    # image the same size (a dependency other libraries still need stays installed).
+    if s.get("image_mb_before") is not None and s.get("image_mb_after") is not None:
+        chips.append(f"image {_num(s['image_mb_before'])} → {_num(s['image_mb_after'])} MB")
     if s.get("sci"):
         chips.append(f"{_num(s['sci']['delta_gco2e'], 4)} gCO2e/run saved")
     good = {i for i, c in enumerate(chips) if "CVE" in c or "gCO2e" in c}
@@ -283,7 +285,7 @@ def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = N
         + _total("lines removed", t["lines_removed"])
         + _total("dependencies removed", t["deps_removed"])
         + _total("CVEs removed", t["cves_removed"], good=True)
-        + _total("MB image saved", t["image_mb_saved"])
+        + _total("MB image change (saved)", t["image_mb_saved"])
         + _total("gCO2e saved per pipeline run", t["sci_gco2e_saved"], digits=4, good=True)
         + "</section>"
         + live
