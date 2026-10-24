@@ -13,3 +13,6 @@ infra/terraform.tfvars
 .gcp_cred.json
 .gitlab_oidc_jwt
 .ruff_cache/
+*.local.md
+*.local.py
+.ref.local/

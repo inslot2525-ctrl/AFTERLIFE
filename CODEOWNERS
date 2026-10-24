@@ -1,8 +1,11 @@
-# GitLab CODEOWNERS. Uncomment once the team's GitLab usernames are known,
-# and require Code Owner approval on the default branch.
-#
-# /afterlife/policy.yaml  @<aditya> @<om> @<ayush>
-# /ci/                    @<om>
-# /flows/                 @<aditya>
-# /infra/                 @<om>
-# /CODEOWNERS             @<aditya> @<om> @<ayush>
+# GitLab CODEOWNERS. Takes effect as a merge gate once "Code owner approval"
+# is turned on for main (Settings > Repository > Protected branches).
+# gate-merge also reads it for features listed under requires_approval.
+
+/afterlife/policy.yaml  @inslot2525-ctrl @OMEExZORO @Ayush32-creator
+/CODEOWNERS             @inslot2525-ctrl @OMEExZORO @Ayush32-creator
+/ci/                    @OMEExZORO
+/infra/                 @OMEExZORO
+/flows/                 @inslot2525-ctrl
+/AGENTS.md              @inslot2525-ctrl
+/app/graveyard.py       @Ayush32-creator

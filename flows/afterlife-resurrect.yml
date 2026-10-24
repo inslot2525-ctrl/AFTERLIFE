@@ -1,28 +1,97 @@
 # AFTERLIFE resurrect flow: the Medium explains who still needs a feature.
-# Trigger: CI calls the Flows API after a knock (if the day-1 check shows that
-# works), otherwise a human mentions the service account on the closed MR.
 #
-# SKELETON: same caveats as afterlife-retire.yml.
+# Trigger: "Mention". After CI's resurrect job closes a Sunset MR and posts the
+# knock table, a human mentions this flow's service account on that MR.
+# (CI can't trigger flows: GitLab requires a human action.)
+#
+# Same spec notes as afterlife-retire.yml.
 
 version: "v1"
 environment: ambient
 
 components:
-  - name: medium
+  - name: "prepare_repo"
+    type: DeterministicStepComponent
+    tool_name: "run_command"
+    inputs:
+      - from: "if git rev-parse --is-shallow-repository | grep -q true; then git fetch --unshallow; fi; git fetch origin afterlife/census || true"
+        as: "command"
+        literal: true
+      - from: "600"
+        as: "timeout"
+        literal: true
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  - name: "medium"
     type: AgentComponent
-    prompt_id: medium
+    prompt_id: "afterlife_medium"
     inputs:
       - from: "context:goal"
-        as: goal
-    # toolset: [read_file, get_merge_request, create_merge_request_note, create_branch, create_commit, create_merge_request]  # TODO: verify
-
-prompts:
-  - prompt_id: medium
-    # TODO: from flows/prompts/medium.md
+        as: "goal"
+      - from: "context:project_id"
+        as: "project_id"
+        optional: true
+      - from: "context:current_date"
+        as: "today"
+    toolset:
+      - "read_file"
+      - "grep"
+      - "edit_file"
+      - "run_command"
+      - "get_merge_request"
+      - "list_all_merge_request_notes"
+      - "create_merge_request_note"
+    ui_log_events:
+      - "on_agent_reasoning"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+      - "on_agent_final_answer"
 
 routers:
-  - from: medium
-    to: end
+  - from: "prepare_repo"
+    to: "medium"
+  - from: "medium"
+    to: "end"
 
 flow:
-  entry_point: medium
+  entry_point: "prepare_repo"
+
+prompts:
+  - name: "afterlife_medium"
+    prompt_id: "afterlife_medium"
+    unit_primitives:
+      - duo_agent_platform
+    params:
+      timeout: 180
+    prompt_template:
+      system: |
+        You are the Medium for AFTERLIFE. A feature was switched off for its vigil and
+        somebody knocked, so CI turned its flag back on and closed the Sunset MR. You
+        explain who still needs the feature and make sure it is not retired again by
+        mistake. You never delete code. Follow AGENTS.md.
+
+        Read the MR (get_merge_request) and its notes (list_all_merge_request_notes):
+        the Coroner's afterlife-verdict block in the description, and CI's
+        ":candle: Resurrected" note with the knock table (time and caller of each knock).
+        Read the feature's census entry with
+        `git show origin/afterlife/census:census/latest.json`.
+
+        Then:
+        1. Comment on the MR (create_merge_request_note): who knocked, when, and what
+           that suggests about their usage pattern (for example a quarterly job the
+           census window could not see). Say plainly that the DEAD verdict was wrong
+           and why. Use only facts from the knock table and the census.
+        2. On a branch `afterlife/resurrect-<feature>` from origin/main, add the feature
+           under `resurrected:` in afterlife/graveyard.yaml with caller, knocked_at,
+           reason and a recheck date. Stage with `git add -u`, commit, push, and open
+           an MR with `glab mr create` titled "Record resurrection of <feature>".
+           If the pattern looks periodic, suggest a longer lookback_days in your
+           comment for a human to decide. Never edit afterlife/policy.yaml.
+
+        Your FINAL answer: the comment's first sentence and the new MR's URL.
+      user: |
+        Today is {{ today }}. Project: {{ project_id }}.
+        You were mentioned here:
+        {{ goal }}

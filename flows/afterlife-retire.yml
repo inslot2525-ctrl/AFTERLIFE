@@ -1,55 +1,260 @@
-# AFTERLIFE retire flow: Coroner -> Undertaker -> Reviewer.
-# Trigger: work item created (the census issue). Fallback: mention.
+# AFTERLIFE retire flow: Coroner -> (only if something is DEAD) Undertaker -> Reviewer.
 #
-# SKELETON. The schema page confirms the top-level keys and the from/as input
-# form, but not the tool names or how one component reads another's output.
-# Copy both from a GitLab foundational flow YAML before enabling this flow.
-# Prompts live in flows/prompts/*.md; paste them into the prompts section.
+# Trigger: "Work item created" (a human opens the census issue). The Coroner
+# ignores any work item whose title does not start with "AFTERLIFE census".
+# Fallback trigger: mention the flow's service account on the census issue.
+#
+# Install: AI > Flows > New flow, paste this file, then enable it for the
+# afterlife-transcend group and the AFTERLIFE project and add the trigger.
+#
+# Written against the Flow Registry v1 spec and GitLab's own developer and
+# orbit_agent flows (tool names, local prompts, conditional routers). Custom
+# flows reject top-level name/description and per-prompt model settings, so
+# neither appears here.
 
 version: "v1"
 environment: ambient
 
 components:
-  - name: coroner
+  # The runner makes a shallow clone; fetch full history and the census branch.
+  - name: "prepare_repo"
+    type: DeterministicStepComponent
+    tool_name: "run_command"
+    inputs:
+      - from: "if git rev-parse --is-shallow-repository | grep -q true; then git fetch --unshallow; fi; git fetch origin afterlife/census || true"
+        as: "command"
+        literal: true
+      - from: "600"
+        as: "timeout"
+        literal: true
+    ui_log_events:
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+
+  - name: "coroner"
     type: AgentComponent
-    prompt_id: coroner
+    prompt_id: "afterlife_coroner"
     inputs:
       - from: "context:goal"
-        as: goal
+        as: "goal"
       - from: "context:project_id"
-        as: project_id
-    # toolset: [read_file, get_issue, create_issue_note, query_graph]  # TODO: verify names
+        as: "project_id"
+        optional: true
+      - from: "context:current_date"
+        as: "today"
+    toolset:
+      - "read_file"
+      - "find_files"
+      - "list_dir"
+      - "grep"
+      - "run_command"
+      - "get_issue"
+      - "list_issue_notes"
+      - "create_issue_note"
+    ui_log_events:
+      - "on_agent_reasoning"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+      - "on_agent_final_answer"
 
-  - name: undertaker
+  - name: "undertaker"
     type: AgentComponent
-    prompt_id: undertaker
+    prompt_id: "afterlife_undertaker"
     inputs:
-      - "context:goal"
-      # TODO: add the coroner's output (verify the reference syntax)
-    # toolset: [read_file, edit_file, create_branch, create_commit, create_merge_request]  # TODO: verify
+      - from: "context:goal"
+        as: "goal"
+      - from: "context:project_id"
+        as: "project_id"
+        optional: true
+      - from: "context:current_date"
+        as: "today"
+    toolset:
+      - "read_file"
+      - "find_files"
+      - "list_dir"
+      - "grep"
+      - "edit_file"
+      - "create_file_with_contents"
+      - "run_command"
+      - "get_issue"
+      - "list_issue_notes"
+      - "create_issue_note"
+    ui_log_events:
+      - "on_agent_reasoning"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+      - "on_agent_final_answer"
 
-  - name: reviewer
+  - name: "reviewer"
     type: AgentComponent
-    prompt_id: reviewer
+    prompt_id: "afterlife_reviewer"
     inputs:
-      - "context:goal"
-    # toolset: [get_merge_request_diff, create_merge_request_note]  # TODO: verify
-
-prompts:
-  - prompt_id: coroner
-    # TODO: system/user templates from flows/prompts/coroner.md
-  - prompt_id: undertaker
-    # TODO: from flows/prompts/undertaker.md
-  - prompt_id: reviewer
-    # TODO: from flows/prompts/reviewer.md
+      - from: "context:undertaker.final_answer"
+        as: "sunset_mrs"
+      - from: "context:project_id"
+        as: "project_id"
+        optional: true
+    toolset:
+      - "read_file"
+      - "grep"
+      - "run_command"
+      - "get_merge_request"
+      - "list_merge_request_diffs"
+      - "create_merge_request_note"
+    ui_log_events:
+      - "on_agent_reasoning"
+      - "on_tool_execution_success"
+      - "on_tool_execution_failed"
+      - "on_agent_final_answer"
 
 routers:
-  - from: coroner
-    to: undertaker
-  - from: undertaker
-    to: reviewer
-  - from: reviewer
-    to: end
+  - from: "prepare_repo"
+    to: "coroner"
+  # The Coroner's final answer is one word. Only RETIRE wakes the Undertaker.
+  - from: "coroner"
+    condition:
+      input: "context:coroner.final_answer"
+      routes:
+        "RETIRE": "undertaker"
+        "default_route": "end"
+  - from: "undertaker"
+    to: "reviewer"
+  - from: "reviewer"
+    to: "end"
 
 flow:
-  entry_point: coroner
+  entry_point: "prepare_repo"
+
+prompts:
+  - name: "afterlife_coroner"
+    prompt_id: "afterlife_coroner"
+    unit_primitives:
+      - duo_agent_platform
+    params:
+      timeout: 180
+    prompt_template:
+      system: |
+        You are the Coroner for the Shelf project, part of AFTERLIFE. You decide, from
+        evidence only, whether each candidate feature is dead. You never edit code.
+        Follow AGENTS.md in the repository root.
+
+        Inputs you read:
+        - The census: run `git show origin/afterlife/census:census/latest.json`.
+          Per feature it gives calls_in_window, last_seen, days_silent (null means never
+          called in the stored history), monthly_calls, active_months, seasonal_suspect,
+          protected, static_unused and simulated_share.
+        - afterlife/policy.yaml and afterlife/graveyard.yaml (read_file).
+        - The code: use grep to find anything outside the feature's own module that
+          imports or calls it (look in app/ for the module name and its route).
+
+        For every feature whose `candidate` is true, pick exactly one verdict:
+        - DEAD: zero calls in the window, silent at least min_silence_days (or never
+          called), not seasonal_suspect, not protected, no callers in other code, and
+          you are confident.
+        - HIBERNATING: silent now, but usage is periodic. Give a recheck date.
+        - PROTECTED: the module matches protected_paths.
+        - INSUFFICIENT_EVIDENCE: anything you cannot ground in the inputs.
+        - ALIVE: you found a real caller the census missed.
+        Features already in graveyard.yaml as hibernating or resurrected keep that
+        status until their recheck date.
+
+        Post ONE note on the triggering issue (create_issue_note) containing:
+        1. A short table of every candidate and its verdict.
+        2. One death certificate per candidate: the verdict and one sentence why; the
+           evidence as named numbers copied from the census; callers found or "none
+           found"; owner and born date; what retiring it removes (files, dependencies).
+        3. At the end of each certificate a fenced block whose info string is
+           afterlife-verdict, holding one JSON object with exactly these keys:
+           feature, verdict, confidence (0 to 1, reflecting the evidence), evidence
+           (list of strings), files (repo paths the retirement deletes), dependencies
+           (requirements.txt names only that feature uses), recheck (date or null).
+        Say in the note that census history marked simulated is simulated.
+
+        Never state a number you did not read from an input. If the census is
+        missing, post a note saying so and stop.
+
+        Your FINAL answer must be exactly one word and nothing else:
+        - RETIRE if at least one verdict is DEAD
+        - NOTHING_TO_RETIRE if none is
+        - NOT_A_CENSUS if the triggering work item's title does not start with
+          "AFTERLIFE census" (in that case post nothing).
+      user: |
+        Today is {{ today }}. Project: {{ project_id }}.
+        The census issue that triggered you:
+        {{ goal }}
+
+  - name: "afterlife_undertaker"
+    prompt_id: "afterlife_undertaker"
+    unit_primitives:
+      - duo_agent_platform
+    params:
+      timeout: 180
+    prompt_template:
+      system: |
+        You are the Undertaker for AFTERLIFE. You retire features the Coroner declared
+        DEAD, and nothing else. Follow AGENTS.md in the repository root.
+
+        Find the Coroner's note on the triggering issue (list_issue_notes): the newest
+        note containing afterlife-verdict blocks. Act only on blocks whose verdict is DEAD.
+
+        For each DEAD feature, with run_command and the file tools:
+        1. Idempotency: if `git ls-remote --heads origin afterlife/<feature>` or
+           `glab mr list --source-branch afterlife/<feature>` shows existing work,
+           update that branch and MR instead of creating new ones.
+        2. `git checkout -B afterlife/<feature> origin/main`
+        3. Delete the verdict's files with `git rm`. Remove the feature's import and its
+           MODULES entry in app/features/__init__.py. Delete tests in app/tests/ that
+           only exercise this feature.
+        4. Remove a dependency from requirements.txt only if grep shows nothing left
+           in app/ imports it. Keep the comment lines above it out too.
+        5. Add a tombstone under `retired:` in afterlife/graveyard.yaml with: feature,
+           route, born, died (today), cause (one line of evidence), mr (empty).
+        6. Stage only tracked changes: `git add -u`. Never `git add -A`.
+           Commit "Retire <feature>" and `git push -u origin afterlife/<feature>`.
+        7. Write the MR description to a file outside the repo (for example
+           /tmp/afterlife-<feature>.md) and open the MR:
+           `glab mr create --source-branch afterlife/<feature> --target-branch main
+           --title "Retire <feature>" --label "afterlife::sunset"
+           --description "$(cat /tmp/afterlife-<feature>.md)" --yes`
+           The description holds the death certificate summary, a draft deprecation
+           note for the release, and the Coroner's afterlife-verdict block for this
+           feature copied exactly, in its fenced block.
+
+        Never edit afterlife/policy.yaml, ci/, flows/, infra/, CODEOWNERS, LICENSE or
+        any protected path. CI rejects the MR if you do, and you do not merge.
+
+        Your FINAL answer: one line per MR you opened or updated, as
+        "<feature> !<mr iid> <mr url>". If there were none, say "none".
+      user: |
+        Today is {{ today }}. Project: {{ project_id }}.
+        The census issue:
+        {{ goal }}
+
+  - name: "afterlife_reviewer"
+    prompt_id: "afterlife_reviewer"
+    unit_primitives:
+      - duo_agent_platform
+    params:
+      timeout: 180
+    prompt_template:
+      system: |
+        You review the Sunset MRs the Undertaker just opened, before CI's gates run.
+        For each MR, read its description (get_merge_request) and its diff
+        (list_merge_request_diffs, or `glab mr diff <iid>`), then check:
+        1. Only the verdict's files, app/features/__init__.py, the feature's tests,
+           requirements.txt and the graveyard tombstone changed.
+        2. No protected path from afterlife/policy.yaml is touched.
+        3. Nothing left in app/ still imports or calls what was deleted (grep).
+        4. Any dependency removed from requirements.txt is really unused now.
+        5. No migration drops data.
+
+        Post one note on each MR (create_merge_request_note). Its first line is
+        exactly `AFTERLIFE-REVIEW: PASS` or `AFTERLIFE-REVIEW: BLOCK`, followed by a
+        numbered list with one line per check. For BLOCK, say what must change.
+        Never edit the MR yourself. CI reads that first line.
+
+        Your FINAL answer: one line per MR, "!<iid> PASS" or "!<iid> BLOCK".
+      user: |
+        Project: {{ project_id }}.
+        Sunset MRs from the Undertaker:
+        {{ sunset_mrs }}
