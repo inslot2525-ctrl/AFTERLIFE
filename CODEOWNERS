@@ -2,10 +2,10 @@
 # is turned on for main (Settings > Repository > Protected branches).
 # gate-merge also reads it for features listed under requires_approval.
 
-/afterlife/policy.yaml  @inslot2525-ctrl @OMEExZORO @Ayush32-creator
-/CODEOWNERS             @inslot2525-ctrl @OMEExZORO @Ayush32-creator
+/afterlife/policy.yaml  @inslot2525-ctrl @OMEExZORO @ayush.agnihotri21
+/CODEOWNERS             @inslot2525-ctrl @OMEExZORO @ayush.agnihotri21
 /ci/                    @OMEExZORO
 /infra/                 @OMEExZORO
 /flows/                 @inslot2525-ctrl
 /AGENTS.md              @inslot2525-ctrl
-/app/graveyard.py       @Ayush32-creator
+/app/graveyard.py       @ayush.agnihotri21
