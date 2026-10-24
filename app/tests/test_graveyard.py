@@ -61,21 +61,21 @@ def test_json_store_keeps_savings(tmp_path):
 def test_census_rows_put_silent_features_first():
     import datetime as dt
 
-    from app.features import FEATURES
     from app.graveyard import census_rows
+    from app.tests.planted import PLANTED_FEATURES
     from app.store import InMemoryStore
 
     today = dt.date(2026, 10, 24)
     store = InMemoryStore()
     store.record_hit("books_v2", today, 5)
     store.record_hit("books_v1", today - dt.timedelta(days=200), 3)
-    rows = {r["feature"]: r for r in census_rows(FEATURES, store, 30, today)}
+    rows = {r["feature"]: r for r in census_rows(PLANTED_FEATURES, store, 30, today)}
 
     assert rows["books_v2"] == {"feature": "books_v2", "route": "/v2/books", "calls_in_window": 5,
                                      "last_seen": "2026-10-24", "days_silent": 0, "candidate": "no"}
     assert rows["books_v1"]["days_silent"] == 200 and rows["books_v1"]["candidate"] == "yes"
     assert rows["import_goodreads"]["last_seen"] == "never"
-    ordered = [r["feature"] for r in census_rows(FEATURES, store, 30, today)]
+    ordered = [r["feature"] for r in census_rows(PLANTED_FEATURES, store, 30, today)]
     assert ordered[-1] == "books_v2"
 
 

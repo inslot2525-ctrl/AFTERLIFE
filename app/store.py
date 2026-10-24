@@ -28,6 +28,8 @@ class UsageStore(Protocol):
 
     def all_savings(self) -> dict[str, dict]: ...
 
+    def clear_usage(self, feature: str) -> None: ...
+
 
 class InMemoryStore:
     def __init__(self) -> None:
@@ -58,6 +60,9 @@ class InMemoryStore:
 
     def all_savings(self) -> dict[str, dict]:
         return dict(self._savings)
+
+    def clear_usage(self, feature: str) -> None:
+        self._days.pop(feature, None)
 
 
 class JsonFileStore(InMemoryStore):
@@ -94,6 +99,10 @@ class JsonFileStore(InMemoryStore):
 
     def record_savings(self, feature: str, savings: dict) -> None:
         super().record_savings(feature, savings)
+        self._save()
+
+    def clear_usage(self, feature: str) -> None:
+        super().clear_usage(feature)
         self._save()
 
 
@@ -147,6 +156,18 @@ class FirestoreStore:
 
     def all_savings(self) -> dict[str, dict]:
         return {doc.id: doc.to_dict() for doc in self._db.collection("savings").stream()}
+
+    def clear_usage(self, feature: str) -> None:
+        days = self._db.collection("usage").document(feature).collection("days")
+        batch, pending = self._db.batch(), 0
+        for doc in days.stream():
+            batch.delete(doc.reference)
+            pending += 1
+            if pending == 400:  # Firestore allows 500 writes per batch
+                batch.commit()
+                batch, pending = self._db.batch(), 0
+        if pending:
+            batch.commit()
 
 
 def store_from_env() -> UsageStore:

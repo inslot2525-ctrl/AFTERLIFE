@@ -2,14 +2,12 @@
 
 from app.features import (
     admin_reindex,
-    books_v1,
     books_v2,
     embed_widget,
     wrapped,
 )
 
 MODULES = [
-    books_v1,
     books_v2,
     wrapped,
     embed_widget,

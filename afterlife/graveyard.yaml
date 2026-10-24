@@ -2,11 +2,17 @@
 # measured savings after release. Every number here links back to a job.
 
 retired:
+  - feature: books_v1
+    route: /v1/books
+    born: "2023-02-14"
+    died: "2026-10-24"
+    cause: "0 calls in 30 days, silent 201 days since 2026-04-06, replaced by /v2/books"
+    mr: ""
   - feature: import_goodreads
     route: /import/goodreads
     born: "2023-06-30"
     died: "2026-10-24"
-    cause: "No calls in the census history (calls_in_window 0, last_seen null), no callers in app/"
+    cause: "0 calls in 30 days, never called in stored history (last_seen null), no callers in app/"
     mr: ""
 
 hibernating: []

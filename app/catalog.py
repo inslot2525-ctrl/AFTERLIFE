@@ -7,9 +7,3 @@ BOOKS: list[dict] = [
     {"id": 4, "title": "Team Topologies", "author": "Matthew Skelton", "status": "to-read", "finished": None},
     {"id": 5, "title": "Designing Data-Intensive Applications", "author": "Martin Kleppmann", "status": "read", "finished": "2026-03-11"},
 ]
-
-
-def add_books(books: list[dict]) -> None:
-    next_id = max((b["id"] for b in BOOKS), default=0) + 1
-    for offset, book in enumerate(books):
-        BOOKS.append({"id": next_id + offset, "finished": None, **book})

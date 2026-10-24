@@ -79,3 +79,11 @@ def test_canary_rolls_back(policy):
 def test_canary_low_traffic_trusts_the_synthetic_check(policy):
     assert canary_decide(3, 3, None, True, policy) == ("promote", [])
     assert canary_decide(3, 0, None, False, policy)[0] == "rollback"
+
+
+def test_registry_path_match_ignores_case():
+    from ci.gitlab import is_project_registry
+    repo = {"path": "afterlife-transcend/afterlife"}
+    assert is_project_registry(repo, "afterlife-transcend/AFTERLIFE")
+    assert not is_project_registry({"path": "afterlife-transcend/afterlife/cache"}, "afterlife-transcend/AFTERLIFE")
+    assert is_project_registry(repo, None)

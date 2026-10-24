@@ -37,7 +37,16 @@ def test_prompt_still_describes_that_layout():
     flow = yaml.safe_load(open("flows/afterlife-retire.yml", encoding="utf-8"))
     undertaker = next(p for p in flow["prompts"] if p["prompt_id"] == "afterlife_undertaker")
     system = undertaker["prompt_template"]["system"]
-    for marker in ("Census-Issue: #", "### Deprecation note", "### Verdict", "afterlife-verdict"):
+    for marker in ("Census-Issue: #", "### Deprecation note", "### Verdict", "afterlife-verdict", "orphans"):
         assert marker in system
     reviewer = next(p for p in flow["prompts"] if p["prompt_id"] == "afterlife_reviewer")
     assert "AFTERLIFE-REVIEW: PASS" in reviewer["prompt_template"]["system"]
+
+
+def test_undertaker_keeps_general_tests_and_reviewer_checks():
+    # Duo Code Review caught a Sunset MR that deleted a general gate test.
+    flow = yaml.safe_load(open("flows/afterlife-retire.yml", encoding="utf-8"))
+    prompts = {p["prompt_id"]: p["prompt_template"]["system"] for p in flow["prompts"]}
+    assert "switch it to books_v2" in prompts["afterlife_undertaker"]
+    assert "sample data" in prompts["afterlife_undertaker"]
+    assert "Every deleted test was about this feature" in prompts["afterlife_reviewer"]

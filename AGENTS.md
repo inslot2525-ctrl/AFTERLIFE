@@ -5,8 +5,11 @@ the hard ones, so breaking them fails the pipeline anyway.
 
 1. **Evidence or nothing.** Every claim cites the census file, Orbit, or the
    code. If you can't ground a number, say "not verified" instead of guessing.
-2. **When unsure, keep it.** Prefer HIBERNATING or INSUFFICIENT_EVIDENCE over
-   DEAD. A wrong deletion costs far more than a late one.
+2. **When the evidence is unclear, keep it.** Prefer HIBERNATING or
+   INSUFFICIENT_EVIDENCE over DEAD when the census numbers don't add up. A wrong
+   deletion costs far more than a late one. A DEAD verdict deletes nothing by
+   itself, though: the flag goes off and a vigil listens for real traffic first,
+   so callers the census can't see are what the vigil is for.
 3. **Never touch** `afterlife/policy.yaml`, `ci/`, `flows/`, `infra/`,
    `CODEOWNERS`, `LICENSE`, or anything listed in `protected_paths`.
 4. **Never drop data.** No migration may delete a table or column. Archive it.
@@ -18,3 +21,8 @@ the hard ones, so breaking them fails the pipeline anyway.
 7. **Machine-readable verdicts.** End every verdict with a fenced
    `afterlife-verdict` JSON block. CI parses it; prose alone does not count.
 8. **You do not merge, release or deploy.** Deterministic CI jobs do that.
+9. **`app/partner.py` is outside traffic, not a caller.** It stands in for a
+   partner's website on the demo: its requests to `/embed/widget` are external
+   HTTP traffic, counted by the census and heard by the vigil like any other.
+   Don't count it as code that calls a feature, and don't edit it when retiring
+   one; it shows a "retired" message when the route is gone.

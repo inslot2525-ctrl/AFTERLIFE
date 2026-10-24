@@ -99,3 +99,31 @@ def test_render_links_every_stage_and_escapes():
 
 def test_empty_state_explains_how_to_start():
     assert "AFTERLIFE census" in render_timeline([])
+
+
+def test_running_vigil_gets_a_countdown_and_knock_count():
+    import datetime as dt
+
+    from app.timeline import clock_text
+
+    started = "2026-10-25T10:00:00Z"
+    vigil = [{"id": 9, "name": "vigil", "status": "running", "started_at": started, "web_url": f"{URL}/-/jobs/9"}]
+    fetch = fake_gitlab([mr(5, "books_v1")], {5: jobs(review_check="success", verdict_check="success",
+                                                       coma="success") + vigil})
+    heard = []
+    [r] = build_timeline(fetch, knocks=lambda feature, since: heard.append((feature, since)) or 0)
+    stage = next(s for s in r["stages"] if s["label"] == "Vigil")
+    assert stage["deadline"].startswith("2026-10-25T10:10:00")  # policy vigil_minutes = 10
+    assert stage["knocks"] == 0 and heard[0][0] == "books_v1"
+
+    now = dt.datetime(2026, 10, 25, 10, 3, 48, tzinfo=dt.timezone.utc)
+    assert clock_text(stage["deadline"], now) == "6:12 left"
+    assert clock_text(stage["deadline"], now + dt.timedelta(minutes=7)) == "deciding"
+    html = render_timeline([r])
+    assert "class='countdown' data-deadline=" in html and "0 knocks" in html
+
+
+def test_finished_vigil_has_no_countdown():
+    fetch = fake_gitlab([mr(5, "books_v1")], {5: jobs(vigil="success")})
+    [r] = build_timeline(fetch, knocks=lambda f, s: 0)
+    assert "deadline" not in next(s for s in r["stages"] if s["label"] == "Vigil")

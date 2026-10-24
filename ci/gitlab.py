@@ -34,6 +34,12 @@ def feature_from_branch(branch: str) -> str:
     return feature
 
 
+def is_project_registry(repo: dict, project_path: str | None) -> bool:
+    """The registry repository named after the project itself. GitLab lowercases
+    registry paths (afterlife-transcend/afterlife), so compare case-insensitively."""
+    return project_path is None or repo["path"].lower() == project_path.lower()
+
+
 class GitLab:
     def __init__(self, token: str | None = None, api_url: str | None = None, project: str | None = None) -> None:
         self.token = token or os.environ["AFTERLIFE_TOKEN"]
@@ -88,7 +94,7 @@ class GitLab:
     def image_size(self, tag: str) -> int | None:
         """Compressed size of the project's own registry image with this tag."""
         for repo in self.get("/registry/repositories") or []:
-            if repo["path"] == os.environ.get("CI_PROJECT_PATH", repo["path"]):
+            if is_project_registry(repo, os.environ.get("CI_PROJECT_PATH")):
                 try:
                     return self.get(f"/registry/repositories/{repo['id']}/tags/{tag}").get("total_size")
                 except GitLabError:

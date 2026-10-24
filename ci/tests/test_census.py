@@ -2,7 +2,7 @@ import datetime as dt
 
 import pytest
 
-from app.features import FEATURES
+from app.tests.planted import PLANTED_FEATURES
 from app.store import InMemoryStore
 from ci.census import build_census, parse_vulture
 from ci.policy import load_policy
@@ -15,7 +15,7 @@ TODAY = dt.date(2026, 10, 24)
 def census():
     store = InMemoryStore()
     seed(store, TODAY)
-    return {f["feature"]: f for f in build_census(FEATURES, store, load_policy(), TODAY)["features"]}
+    return {f["feature"]: f for f in build_census(PLANTED_FEATURES, store, load_policy(), TODAY)["features"]}
 
 
 def test_live_feature_is_not_a_candidate(census):
@@ -60,3 +60,10 @@ def test_parse_vulture_groups_by_file():
     findings = parse_vulture(output)
     assert findings["app/features/books_v1.py"] == ["line 22: unused function 'list_books_v1' (60% confidence)"]
     assert "app/catalog.py" in findings
+
+
+def test_partner_widget_fades_out_instead_of_stopping(census):
+    # An abrupt stop reads as a measurement gap; a fade reads as a dying integration.
+    months = list(census["embed_widget"]["monthly_calls"].values())
+    steady, fading, last = max(months), months[-2], months[-1]
+    assert 0 < last < fading < steady / 2

@@ -161,7 +161,7 @@ def _total(label: str, value, digits: int = 1, good: bool = False) -> str:
 
 def nav(current: str) -> str:
     """The bar shared by Shelf's pages, so the video can move between them."""
-    links = [("Reading list", "/"), ("Graveyard", "/graveyard")]
+    links = [("Reading list", "/"), ("Graveyard", "/graveyard"), ("Partner demo", "/partner")]
     items = "".join(
         f"<a href='{href}'{' aria-current=\"page\"' if label == current else ''}>{label}</a>"
         for label, href in links
@@ -320,15 +320,20 @@ def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = N
     )
 
 
+def _knocks(store: UsageStore) -> timeline.Knocks:
+    """How many knocks a feature has had since its vigil began, for the countdown."""
+    return lambda feature, since: len(store.knocks(feature, since))
+
+
 @router.get("/graveyard", response_class=HTMLResponse)
 def graveyard(request: Request) -> str:
     store = request.app.state.store
     window = census_window_days()
     return render(load_ledger(), store.all_savings(), cached_census(store, window), window,
-                  timeline.render_timeline(*timeline.cached_timeline()))
+                  timeline.render_timeline(*timeline.cached_timeline(knocks=_knocks(store))))
 
 
 @router.get("/graveyard/timeline", response_class=HTMLResponse)
-def graveyard_timeline() -> str:
+def graveyard_timeline(request: Request) -> str:
     """The timeline section alone, for the page's 15-second refresh."""
-    return timeline.render_timeline(*timeline.cached_timeline())
+    return timeline.render_timeline(*timeline.cached_timeline(knocks=_knocks(request.app.state.store)))
