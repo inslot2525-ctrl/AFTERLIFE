@@ -3,6 +3,3 @@ uvicorn
 pyyaml
 google-cloud-firestore
 UnleashClient
-# Pinned on purpose: only the Goodreads importer uses it, and this version has
-# known CVEs. Retiring that feature removes the dependency and the CVEs with it.
-requests==2.31.0
