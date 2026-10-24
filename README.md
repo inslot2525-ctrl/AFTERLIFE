@@ -19,6 +19,8 @@ Built for the GitLab Transcend hackathon, *Life After Code*: Path A (start fresh
 3. **Undertaker** (Duo agent). Runs only if something is DEAD. Deletes the feature, its tests and its now-unused
    dependencies, adds a tombstone to `afterlife/graveyard.yaml`, and opens a Sunset MR.
 4. **Reviewer** (Duo agent). Checks the diff against the verdict and posts `AFTERLIFE-REVIEW: PASS` or `BLOCK`.
+   GitLab's own **Duo Code Review** flow reviews every Sunset MR too, and its "requested changes" blocks
+   the merge. On our first run it caught a Sunset MR that deleted a general test.
 5. **Gates** (CI). Tests, SAST, secret detection, CVEs before and after, unused code before and after, and
    `verdict_check` against the policy **from the target branch**, so an MR can't loosen the rules that judge it.
 6. **Coma and vigil** (CI). The feature flag goes off in production. The route answers `410 Gone` and every request is

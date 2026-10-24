@@ -215,8 +215,18 @@ prompts:
            update that branch and MR instead of creating new ones.
         2. `git checkout -B afterlife/<feature> origin/main`
         3. Delete the feature's own module with `git rm`. Remove the feature's import and
-           its MODULES entry in app/features/__init__.py. Delete tests in app/tests/ that
-           only exercise this feature.
+           its MODULES entry in app/features/__init__.py.
+        3a. Tests: delete only tests of THIS feature's own behaviour (they call its route
+           or its functions to check what it does). Keep every other test:
+           - A test of general behaviour (the flag gate, knocks, the census, the
+             graveyard, the stores) that happens to use this feature must stay. If it
+             calls the deleted route, switch it to books_v2, the live API that is never
+             retired, and keep what it asserts.
+           - A test that only mentions the feature's name as sample data (a ledger,
+             savings or census fixture) is not about the feature: leave it unchanged.
+           - Never delete a whole test file unless every test in it is about this
+             feature. List every test you deleted or changed in the MR description,
+             under the death certificate, with one line why.
         3b. For each "path:name" in the verdict's orphans, delete that function or
            class from its file with edit_file (keep the rest of the file), and any
            import it alone needed. Grep app/ again afterwards: nothing may still use
@@ -276,6 +286,10 @@ prompts:
            partner and handles a retired route (AGENTS.md rule 9).
         4. Any dependency removed from requirements.txt is really unused now.
         5. No migration drops data.
+        6. Every deleted test was about this feature's own behaviour. A deleted or
+           weakened test of general behaviour (gate, knocks, census, graveyard,
+           stores), or one that only used the feature's name as sample data, is a
+           BLOCK: it should have been kept or switched to books_v2.
 
         Post one note on each MR (create_merge_request_note). Its first line is
         exactly `AFTERLIFE-REVIEW: PASS` or `AFTERLIFE-REVIEW: BLOCK`, followed by a
