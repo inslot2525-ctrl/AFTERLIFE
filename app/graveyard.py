@@ -15,7 +15,7 @@ import yaml
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from app import timeline
+from app import timeline, verdicts
 from app.features import FEATURES
 from app.registry import Feature
 from app.store import UsageStore
@@ -148,7 +148,9 @@ def totals(retired: list[dict], savings: dict[str, dict]) -> dict:
         "lines_removed": sum(s.get("lines_removed", 0) for s in measured),
         "deps_removed": sum(len(s.get("deps_removed", [])) for s in measured),
         "cves_removed": sum(len(s.get("cves_removed", [])) for s in measured),
-        "image_mb_saved": round(sum(s.get("image_mb_saved") or 0 for s in measured), 1),
+        # None, not 0, when no retirement has a measured image size: shown as a dash.
+        "image_mb_saved": (round(sum(s["image_mb_saved"] for s in measured if s.get("image_mb_saved") is not None), 1)
+                           if any(s.get("image_mb_saved") is not None for s in measured) else None),
         "sci_gco2e_saved": round(sum(sci), 4) if sci else None,
     }
 
@@ -289,7 +291,8 @@ def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = N
         + _h2("Hibernating", len(ledger["hibernating"]), "hibernating")
         + "<p class='lead'>Quiet, but not dead. The Coroner refused to retire these.</p>"
         + _table(ledger["hibernating"], [("Feature", "feature"), ("Why it was kept", "reason"),
-                                         ("Check again", "recheck")], "No hibernating features.", cells=feature)
+                                         ("Check again", "recheck"), ("Decided by", "source")],
+                 "No hibernating features.", cells=feature)
         + _h2("Resurrected", len(ledger["resurrected"]), "resurrected")
         + "<p class='lead'>Switched off for the vigil, then somebody knocked. Nothing was deleted.</p>"
         + _table(ledger["resurrected"], [("Feature", "feature"), ("Who knocked", "caller"),
@@ -329,8 +332,13 @@ def _knocks(store: UsageStore) -> timeline.Knocks:
 def graveyard(request: Request) -> str:
     store = request.app.state.store
     window = census_window_days()
-    return render(load_ledger(), store.all_savings(), cached_census(store, window), window,
+    return render(current_ledger(), store.all_savings(), cached_census(store, window), window,
                   timeline.render_timeline(*timeline.cached_timeline(knocks=_knocks(store))))
+
+
+def current_ledger() -> dict:
+    """The ledger in git, plus the features the Coroner's latest verdicts kept."""
+    return verdicts.with_verdicts(load_ledger(), *verdicts.cached_verdicts())
 
 
 @router.get("/graveyard/timeline", response_class=HTMLResponse)

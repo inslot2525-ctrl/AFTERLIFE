@@ -105,3 +105,8 @@ def test_census_marks_protected_features_and_formats_knock_times():
     assert "pill protected'>protected" in html and "pill candidate" not in html
     assert "3,218" in html and "pill alive'>in use" in html
     assert "2026-10-26 12:03 UTC" in html
+
+
+def test_image_total_is_a_dash_when_never_measured():
+    unmeasured = {"import_goodreads": {**SAVINGS["import_goodreads"], "image_mb_saved": None}}
+    assert totals(LEDGER["retired"], unmeasured)["image_mb_saved"] is None

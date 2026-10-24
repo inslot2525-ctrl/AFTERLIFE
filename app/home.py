@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from app.catalog import BOOKS
-from app.graveyard import STYLE, load_ledger, nav
+from app.graveyard import STYLE, current_ledger, nav
 
 router = APIRouter()
 
@@ -75,4 +75,4 @@ def render(books: list[dict], ledger: dict | None = None) -> str:
 
 @router.get("/", response_class=HTMLResponse)
 def home() -> str:
-    return render(BOOKS, load_ledger())
+    return render(BOOKS, current_ledger())
