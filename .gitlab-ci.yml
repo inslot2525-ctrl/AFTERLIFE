@@ -11,6 +11,10 @@
 
 workflow:
   rules:
+    # A census run must finish even when someone pushes to main meanwhile.
+    - if: $AFTERLIFE_PIPELINE == "census"
+      auto_cancel:
+        on_new_commit: none
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "web"
