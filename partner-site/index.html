@@ -3,44 +3,95 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f5efe6">
 <title>Acme Book Club (demo partner)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600&family=Michroma&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-  :root { --bg: #f4efe6; --card: #fff8ee; --ink: #2b2116; --quiet: #7a6650; --line: #ead8c3; --accent: #b5532a; --bad: #8f2a20; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #17130f; --card: #221c16; --ink: #f1e7da; --quiet: #b9a58c; --line: #3a3027; --accent: #e07a4b; --bad: #f08a7f; }
+  /* Acme Book Club: a made-up partner with its own daylight brand, so on camera
+     it is obviously someone else's site. Shelf only appears inside the widget. */
+  :root {
+    --bg: #f5efe6; --ink: #231c15; --quiet: #7a6d5f; --faint: #b0a291;
+    --glass: rgba(255, 255, 255, 0.55); --edge: rgba(255, 255, 255, 0.85); --shadow: rgba(110, 80, 50, 0.16);
+    --clay: #c8643b; --clay-soft: rgba(200, 100, 59, 0.12); --leaf: #4f8a62; --rose: #b8456b;
+    --shelf-bg: #07080b; --shelf-ink: #eef2f7; --shelf-ice: #a6dcff;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 720px; margin: 0 auto; padding: 32px 16px 48px; }
-  .demo-note { border: 1px dashed var(--line); border-radius: 10px; padding: 10px 14px; color: var(--quiet); font-size: 13.5px; margin: 0 0 22px; }
-  .demo-note code { font-size: 12.5px; }
-  .site { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; }
-  h1 { font: 700 26px/1.2 Georgia, "Times New Roman", serif; margin: 0 0 4px; }
-  .tag { color: var(--quiet); margin: 0 0 18px; }
-  button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; font: 600 15px system-ui, sans-serif; cursor: pointer; }
-  button:disabled { opacity: .6; cursor: wait; }
-  .slot { margin-top: 16px; min-height: 64px; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
-  .slot ul { margin: 6px 0 0 18px; padding: 0; }
-  .slot.retired { border-color: var(--bad); color: var(--bad); }
-  .slot.empty { color: var(--quiet); }
-  .log { margin-top: 18px; font: 12.5px/1.6 ui-monospace, Consolas, monospace; color: var(--quiet); }
-  .log b { color: var(--ink); }
+  html { background: var(--bg); }
+  body { margin: 0; min-height: 100vh; color: var(--ink); background: transparent; overflow-x: clip;
+    font: 300 15px/1.7 "Sora", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  body::before, body::after { content: ""; position: fixed; z-index: -1; border-radius: 50%; filter: blur(80px); pointer-events: none; }
+  body::before { width: 620px; height: 620px; top: -220px; left: -160px; background: radial-gradient(circle, rgba(255, 176, 128, 0.7), transparent 70%); }
+  body::after { width: 560px; height: 560px; bottom: -220px; right: -140px; background: radial-gradient(circle, rgba(190, 170, 255, 0.55), transparent 70%); }
+  main { max-width: 760px; margin: 0 auto; padding: 28px 22px 80px; }
+  .glass { background: var(--glass); border: 1px solid var(--edge); border-radius: 26px;
+    backdrop-filter: blur(24px) saturate(1.5); -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    box-shadow: 0 30px 60px -30px var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.9); }
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px 12px 18px; margin-bottom: 40px; border-radius: 999px; }
+  .logo { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.01em; }
+  .logo svg { width: 26px; height: 26px; }
+  .chip { font: 500 11px/1 "IBM Plex Mono", monospace; letter-spacing: 0.06em; color: var(--quiet);
+    padding: 8px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.6); border: 1px solid var(--edge); }
+  .hello { padding: 6px 4px 30px; }
+  .hello small { font: 500 11px/1 "IBM Plex Mono", monospace; letter-spacing: 0.18em; text-transform: uppercase; color: var(--clay); }
+  h1 { margin: 14px 0 12px; font: 300 clamp(36px, 6vw, 56px)/1.05 "Sora", sans-serif; letter-spacing: -0.035em; }
+  h1 b { font-weight: 600; }
+  .tag { margin: 0; max-width: 46ch; color: var(--quiet); }
+  .site { padding: 26px; }
+  .site-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  .site-head h2 { margin: 0; font: 600 18px/1.2 "Sora", sans-serif; letter-spacing: -0.01em; }
+  button { appearance: none; border: 0; cursor: pointer; padding: 13px 20px; border-radius: 999px; color: #fff;
+    font: 600 14px/1 "Sora", sans-serif; letter-spacing: -0.005em; background: linear-gradient(180deg, #d4744a, var(--clay));
+    box-shadow: 0 12px 24px -12px rgba(200, 100, 59, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.35); transition: transform .2s, box-shadow .2s; }
+  button:hover { transform: translateY(-1px); box-shadow: 0 16px 28px -12px rgba(200, 100, 59, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+  button:disabled { opacity: .6; cursor: wait; transform: none; }
+  /* the embed: Shelf's own dark glass, so the viewer sees the two worlds meet */
+  .embed { position: relative; margin-top: 6px; padding: 18px 20px 20px; border-radius: 20px; color: var(--shelf-ink);
+    background: radial-gradient(120% 140% at 100% 0%, rgba(166, 220, 255, 0.16), transparent 50%), var(--shelf-bg);
+    box-shadow: 0 24px 40px -24px rgba(7, 8, 11, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+  .embed .badge { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px; font: 400 9.5px/1 "Michroma", sans-serif;
+    letter-spacing: 0.2em; text-transform: uppercase; color: rgba(238, 242, 247, 0.6); }
+  .embed .badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--shelf-ice); box-shadow: 0 0 10px var(--shelf-ice); }
+  .slot { min-height: 56px; font: 400 13.5px/1.6 "IBM Plex Mono", monospace; color: rgba(238, 242, 247, 0.85); }
+  .slot.empty { color: rgba(238, 242, 247, 0.45); }
+  .slot.retired { color: #ffb3ab; }
+  .slot h3, .slot strong { font-family: "Michroma", sans-serif; font-weight: 400; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--shelf-ice); }
+  .slot ul { margin: 8px 0 0 18px; padding: 0; }
+  .log { margin-top: 18px; padding: 0 6px; font: 400 12px/1.8 "IBM Plex Mono", monospace; color: var(--quiet); }
+  .log b { color: var(--ink); font-weight: 500; }
+  .demo-note { margin: 40px 6px 0; padding-top: 18px; border-top: 1px solid rgba(35, 28, 21, 0.1); color: var(--faint); font-size: 12.5px; line-height: 1.7; }
+  .demo-note code { font: 400 11.5px "IBM Plex Mono", monospace; color: var(--quiet); word-break: break-all; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
 <main>
+  <header class="top glass">
+    <span class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="6" width="9" height="20" rx="2" fill="#c8643b"/><rect x="15" y="9" width="7" height="17" rx="2" fill="#4f8a62"/><rect x="23" y="5" width="5" height="21" rx="2" fill="#b8456b" transform="rotate(8 25.5 15.5)"/></svg>Acme Book Club</span>
+    <span class="chip">Thursday circle &middot; 41 members</span>
+  </header>
+  <section class="hello">
+    <small>This week</small>
+    <h1>What our members are <b>reading</b>.</h1>
+    <p class="tag">A small reading circle that meets on Thursdays. Our shelf is kept by Shelf, and its widget shows what everyone has open right now.</p>
+  </section>
+  <section class="site glass">
+    <div class="site-head">
+      <h2>Currently reading</h2>
+      <button id="load" type="button">Load the Shelf widget</button>
+    </div>
+    <div class="embed">
+      <span class="badge"><i></i>Powered by Shelf</span>
+      <div id="slot" class="slot empty">The widget loads here.</div>
+    </div>
+    <div id="log" class="log" aria-live="polite"></div>
+  </section>
   <p class="demo-note">A pretend partner website for the AFTERLIFE demo. Acme Book Club is made up. It is hosted
     separately from Shelf (on GitLab Pages) and embeds Shelf's &ldquo;currently reading&rdquo; widget the way a real
     partner would. Nothing is sent until you click: then it makes one request to
     <code id="target">/embed/widget</code> with Acme's partner key. While Shelf holds a vigil for the widget, that
     request is a knock and brings the widget back.</p>
-  <section class="site">
-    <h1>Acme Book Club</h1>
-    <p class="tag">What our members are reading this week, powered by Shelf.</p>
-    <button id="load" type="button">Load the Shelf widget</button>
-    <div id="slot" class="slot empty">The widget loads here.</div>
-  </section>
-  <div id="log" class="log" aria-live="polite"></div>
 </main>
 <script>
 (function () {
