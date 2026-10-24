@@ -1,32 +1,47 @@
 # Coefficients for the SCI estimate. Every value MUST carry a source.
 # measure.py refuses to compute SCI while a required value is null, and
 # still reports the measured deltas (lines, deps, CVEs, image MB, minutes).
+# How each value was chosen, and its limits, is in docs/sci.md.
 #
-# The compute and memory values below follow the Cloud Carbon Footprint
-# methodology for GCP (https://www.cloudcarbonfootprint.org/docs/methodology).
-# VERIFY against the current page and cite the date in docs/sci.md.
+# The functional unit R is one CI pipeline run, so these coefficients
+# describe the machine the pipeline runs on: the team's self-hosted runner,
+# a laptop in India running Docker Desktop.
 version: 1
-source_checked_on: null            # e.g. 2026-10-25
+source_checked_on: 2026-10-24
 
+# Cloud Carbon Footprint methodology, GCP coefficients
+# (https://www.cloudcarbonfootprint.org/docs/methodology). The laptop has no
+# published coefficients, so the cloud ones are a stated proxy.
 compute:
-  min_watts_per_vcpu: 0.71         # CCF, GCP average
-  max_watts_per_vcpu: 4.26         # CCF, GCP average
+  min_watts_per_vcpu: 0.71         # CCF, GCP median min watts
+  max_watts_per_vcpu: 4.26         # CCF, GCP median max watts
   assumed_utilisation: 0.5         # stated assumption, not measured
 memory_kwh_per_gb_hour: 0.000392   # CCF
-pue: 1.1                           # CCF, GCP
+pue: 1.1                           # CCF, GCP (proxy; a laptop has no data-centre overhead)
 
-# Grid intensity of the chosen region, gCO2e/kWh, from a public dataset.
-# Om fills this on day 1 together with the region choice.
+# Grid where the pipeline's electricity comes from. The runner is in India;
+# Google's asia-south1 (Mumbai) figure is used as the proxy.
 grid:
-  region: europe-north1            # Finland, 98% Google CFE (2025)
-  gco2e_per_kwh: 30                # grid intensity, Google 2025 data
+  region: asia-south1 (proxy for the runner in India)
+  gco2e_per_kwh: 598               # Google, 2025 data
   source: https://cloud.google.com/sustainability/region-carbon (2025 data, checked 2026-10-24)
 
-# Embodied emissions share; an estimate, labelled as such in the write-up.
-embodied:
-  gco2e_per_vcpu_hour: null
-  source: null
+# Where Shelf itself is served. Not used by measure.py (R is a pipeline run);
+# kept for the write-up's serving comparison.
+serving_grid:
+  region: europe-north1            # Finland, 98% Google CFE (2025)
+  gco2e_per_kwh: 30                # Google, 2025 data
+  source: https://cloud.google.com/sustainability/region-carbon (2025 data, checked 2026-10-24)
 
+# CCF embodied method: M = TE x (TR/EL) x (RR/TotalResources).
+# TE = 1255.46 kgCO2e for the E2 platform (ccf-coefficients, coefficients-gcp-embodied.csv),
+# EL = 4 years (CCF), TotalResources = 32 vCPUs (largest E2 machine).
+# 1255.46 kg / 35040 h / 32 vCPU = 1.12 gCO2e per vCPU-hour. A proxy for the laptop.
+embodied:
+  gco2e_per_vcpu_hour: 1.12
+  source: https://github.com/cloud-carbon-footprint/ccf-coefficients (output/coefficients-gcp-embodied.csv, e2), method https://www.cloudcarbonfootprint.org/docs/embodied-emissions
+
+# Docker Desktop VM on the runner laptop, from `docker info` (2026-10-24).
 runner:
-  vcpus: 2                         # GitLab.com small SaaS runner; verify
+  vcpus: 14
   memory_gb: 8

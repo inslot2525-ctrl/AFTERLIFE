@@ -11,7 +11,17 @@ from ci.release_notes import render as render_release
 from ci.resurrect import resurrection_note
 from ci.runner_minutes import job_minutes
 
-COEFFICIENTS = yaml.safe_load(Path("afterlife/sci_coefficients.yaml").read_text())
+# Fixed test values, so the formula tests don't move when the real
+# coefficients in afterlife/sci_coefficients.yaml are updated.
+COEFFICIENTS = {
+    "compute": {"min_watts_per_vcpu": 0.71, "max_watts_per_vcpu": 4.26, "assumed_utilisation": 0.5},
+    "memory_kwh_per_gb_hour": 0.000392,
+    "pue": 1.1,
+    "grid": {"gco2e_per_kwh": 30},
+    "embodied": {"gco2e_per_vcpu_hour": None},
+    "runner": {"vcpus": 2, "memory_gb": 8},
+}
+SHIPPED = yaml.safe_load(Path("afterlife/sci_coefficients.yaml").read_text())
 REQUIREMENTS_BEFORE = "fastapi\npyyaml\n# importer only\nrequests==2.31.0\n-r extra.txt\n"
 REQUIREMENTS_AFTER = "fastapi\npyyaml\n"
 AUDIT_BEFORE = {"dependencies": [
@@ -60,7 +70,14 @@ def test_cve_ids():
 
 
 def test_sci_refuses_missing_coefficients():
-    assert sci(10, COEFFICIENTS) is None  # embodied ships as null on purpose
+    assert sci(10, COEFFICIENTS) is None  # embodied is null in the fixture
+
+
+def test_shipped_coefficients_are_complete_and_sourced():
+    assert sci(10, SHIPPED) is not None
+    for section in ("grid", "embodied"):
+        assert SHIPPED[section]["source"].startswith("https://")
+    assert SHIPPED["source_checked_on"] is not None
 
 
 def test_sci_formula():
