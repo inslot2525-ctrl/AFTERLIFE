@@ -181,37 +181,60 @@ def cached_timeline(fetch: Fetch = gitlab_fetch, knocks: Knocks | None = None) -
     return _cache["value"], _cache["error"]
 
 
-STYLE = """
+STYLE = r"""
+/* --- active cases: one panel per retirement -------------------------------- */
 .timeline { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-.retirement { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-.retirement header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
-  flex-wrap: wrap; margin-bottom: 12px; }
-.retirement h3 { margin: 0; font-size: 16px; }
-.retirement h3 a { color: var(--ink); text-decoration: none; }
-.retirement h3 a:hover { color: var(--accent); text-decoration: underline; }
-.outcome { font-size: 12.5px; border: 1px solid currentColor; border-radius: 999px; padding: 1px 10px; }
-.outcome.retired { color: var(--good); } .outcome.resurrected { color: var(--accent); }
-.outcome.failed, .outcome.rolled-back { color: #d4493b; } .outcome.in-progress { color: var(--warn); }
-.steps { display: flex; gap: 0; overflow-x: auto; padding-bottom: 4px; }
-.step { flex: 1 0 96px; position: relative; text-align: center; font-size: 12.5px; padding-top: 22px;
-  color: var(--quiet); text-decoration: none; }
-.step::before { content: ""; position: absolute; top: 6px; left: 50%; width: 12px; height: 12px;
-  margin-left: -6px; border-radius: 50%; border: 2px solid var(--line); background: var(--card); z-index: 1; }
-.step::after { content: ""; position: absolute; top: 12px; left: -50%; width: 100%; height: 2px;
-  background: var(--line); }
+.retirement { position: relative; overflow: hidden; padding: 20px 22px 18px; background: var(--panel); border: 1px solid var(--line);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px)); }
+.retirement::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--line-hi); }
+.retirement:has(.outcome.retired)::before { background: var(--specimen); }
+.retirement:has(.outcome.resurrected)::before { background: var(--defib); box-shadow: 0 0 18px var(--defib); }
+.retirement:has(.outcome.in-progress)::before { background: var(--hazard); }
+.retirement:has(.outcome.failed)::before, .retirement:has(.outcome.rolled-back)::before { background: var(--alarm); }
+.retirement:has(.step.active)::after { content: ""; position: absolute; top: 0; left: 0; width: 25%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--hazard), transparent); animation: scanline 2.4s linear infinite; }
+.retirement header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 22px; padding-bottom: 14px; border-bottom: 1px dashed var(--line); }
+.retirement h3 { margin: 0; font: 700 20px/1 var(--display); letter-spacing: 0.06em; text-transform: uppercase; }
+.retirement h3::before { content: "SUBJECT // "; font: 500 10.5px/1 var(--mono); letter-spacing: 0.14em; color: var(--faint); }
+.retirement h3 a { color: var(--ink); }
+.retirement h3 a::after { content: " \2197"; font: 400 12px/1 var(--mono); color: var(--faint); }
+.retirement h3 a:hover { color: var(--hazard); }
+.outcome { padding: 6px 10px; font: 700 11px/1 var(--display); letter-spacing: 0.22em; text-transform: uppercase; border: 1px solid currentColor; }
+.outcome.retired { color: var(--specimen); }
+.outcome.resurrected { color: var(--bg); background: var(--defib); border-color: var(--defib); box-shadow: 0 0 20px rgba(255, 79, 154, 0.45); }
+.outcome.failed, .outcome.rolled-back { color: var(--alarm); }
+.outcome.in-progress { color: var(--bg); background: var(--hazard); border-color: var(--hazard); }
+.steps { display: flex; overflow-x: auto; padding: 0 0 4px; scrollbar-width: none; }
+.steps::-webkit-scrollbar { display: none; }
+.step { flex: 1 1 0; min-width: 80px; position: relative; padding: 26px 4px 0; text-align: center;
+  font: 400 10.5px/1.45 var(--mono); color: var(--faint); text-wrap: balance; }
+.step b { display: block; margin-bottom: 4px; font: 600 11px/1.2 var(--display); letter-spacing: 0.12em; text-transform: uppercase; color: var(--quiet); }
+.step::before { content: ""; position: absolute; top: 4px; left: 50%; width: 12px; height: 12px; margin-left: -6px; z-index: 1;
+  background: var(--bg); border: 1px solid var(--line-hi); transform: rotate(45deg); transition: transform .2s; }
+.step::after { content: ""; position: absolute; top: 10px; left: -50%; width: 100%; height: 1px;
+  background: repeating-linear-gradient(90deg, var(--line-hi) 0 4px, transparent 4px 7px); }
 .step:first-child::after { display: none; }
-.step b { display: block; color: var(--ink); font-weight: 600; }
-.step.done::before { background: var(--good); border-color: var(--good); }
-.step.done::after { background: var(--good); }
-.step.active::before { border-color: var(--warn); background: var(--warn); animation: pulse 1.2s infinite; }
-.step.failed::before { background: #d4493b; border-color: #d4493b; }
-.step.knocked::before { background: var(--accent); border-color: var(--accent); }
-.step.knocked::after { background: var(--good); }
-.step.skipped { opacity: 0.5; }
+a.step:hover::before { transform: rotate(45deg) scale(1.4); }
+a.step:hover b { color: var(--hazard); }
+.step.done b { color: var(--ink); }
+.step.done::before { background: var(--specimen); border-color: var(--specimen); }
+.step.done::after { background: var(--specimen); height: 2px; top: 9px; }
+.step.active b { color: var(--hazard); }
+.step.active::before { background: var(--hazard); border-color: var(--hazard); box-shadow: 0 0 0 4px var(--hazard-soft), 0 0 18px var(--hazard);
+  animation: vitals 1.1s ease-in-out infinite; }
+.step.failed b { color: var(--alarm); }
+.step.failed::before { background: var(--alarm); border-color: var(--alarm); }
+.step.knocked b { color: var(--defib); }
+.step.knocked::before { background: var(--defib); border-color: var(--defib); box-shadow: 0 0 0 5px var(--defib-soft), 0 0 22px var(--defib); }
+.step.knocked::after { background: var(--specimen); height: 2px; top: 9px; }
+.step.skipped { opacity: 0.35; }
+@keyframes vitals { 0%, 100% { transform: rotate(45deg) scale(1); } 50% { transform: rotate(45deg) scale(1.35); } }
 @keyframes pulse { 50% { opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) { .step.active::before { animation: none; } }
-.timeline-error { color: var(--warn); font-size: 13px; }
-.countdown { color: var(--warn); font-weight: 700; font-variant-numeric: tabular-nums; }
+.timeline-error { color: var(--hazard); font: 500 12px/1.4 var(--mono); }
+.countdown { display: inline-block; margin-top: 4px; padding: 4px 7px; font: 600 13px/1 var(--mono); font-variant-numeric: tabular-nums;
+  color: var(--bg); background: var(--hazard); box-shadow: 0 0 16px rgba(255, 210, 63, 0.45); }
+.countdown::before { content: "VIGIL "; font: 700 9.5px/1 var(--display); letter-spacing: 0.14em; }
 """
 
 STATE_WORDS = {"done": "done", "active": "now", "waiting": "queued", "failed": "failed",

@@ -15,7 +15,7 @@ import yaml
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from app import timeline, verdicts
+from app import theme, timeline, verdicts
 from app.features import FEATURES
 from app.registry import Feature
 from app.store import UsageStore
@@ -28,66 +28,59 @@ CENSUS_TTL_SECONDS = 300
 
 router = APIRouter()
 
-STYLE = """
-:root {
-  --bg: #f6f5f2; --card: #ffffff; --ink: #1d1c1a; --quiet: #6b6862; --line: #dedbd4;
-  --accent: #5b4bd6; --good: #1f7a4d; --warn: #9a5b00; --stone: #ebe8e1;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #121214; --card: #1b1b1f; --ink: #ecebe8; --quiet: #9d9a94; --line: #2e2e34;
-    --accent: #9d93ff; --good: #5fd39b; --warn: #f0b45a; --stone: #24242a;
-  }
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 48px; }
-a { color: var(--accent); }
-code, .mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.92em; }
-nav { display: flex; gap: 18px; align-items: baseline; padding-bottom: 14px; margin-bottom: 28px;
-  border-bottom: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
-nav .brand { font-weight: 700; color: var(--ink); text-decoration: none; letter-spacing: 0.04em; margin-right: auto; }
-nav a { color: var(--quiet); text-decoration: none; }
-nav a:hover, nav a[aria-current] { color: var(--ink); }
-h1 { font-size: 32px; margin: 0 0 6px; letter-spacing: -0.02em; }
-h2 { font-size: 18px; margin: 40px 0 12px; display: flex; align-items: baseline; gap: 8px; scroll-margin-top: 16px; }
-h2 .count { color: var(--quiet); font-weight: 500; font-size: 14px; font-variant-numeric: tabular-nums; }
-.lead { color: var(--quiet); margin: 0 0 24px; max-width: 680px; }
-h2 + .lead { margin-top: -4px; font-size: 14px; }
-.totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-.total { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-.total b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.total span { color: var(--quiet); font-size: 13px; }
-.total.good b { color: var(--good); }
-.stones { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px 16px;
-  padding-bottom: 14px; border-bottom: 6px solid var(--line); }
-.stone { background: linear-gradient(180deg, var(--card), var(--stone)); border: 1px solid var(--line);
-  border-bottom-width: 3px; border-radius: 140px 140px 8px 8px; padding: 34px 22px 18px; text-align: center; }
-.stone .rip { font-size: 11px; letter-spacing: 0.3em; color: var(--quiet); margin-bottom: 8px; }
-.stone h3 { margin: 0; font: 600 20px/1.3 Georgia, "Times New Roman", serif; overflow-wrap: anywhere; }
-.stone .route { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--quiet); }
-.stone .dates { margin: 6px 0 10px; font-size: 13px; color: var(--quiet); }
-.stone .cause { font-style: italic; margin: 0 0 14px; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 12px; }
-.chip { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px;
-  font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.chip.good { color: var(--good); border-color: currentColor; }
-.pending { color: var(--warn); font-size: 13px; margin: 0 0 12px; }
-.links a { color: var(--accent); font-size: 13px; margin: 0 6px; }
-table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line);
-  border-radius: 12px; overflow: hidden; }
-th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { font-size: 12.5px; color: var(--quiet); font-weight: 600; }
-th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
-tr:last-child td { border-bottom: 0; }
-.pill { display: inline-block; font-size: 12px; border: 1px solid currentColor; border-radius: 999px;
-  padding: 0 9px; white-space: nowrap; }
-.pill.candidate { color: var(--warn); } .pill.alive { color: var(--good); } .pill.protected { color: var(--accent); }
-.pill.quiet { color: var(--quiet); }
-.empty { color: var(--quiet); }
-.scroll { overflow-x: auto; }
-footer { margin-top: 40px; color: var(--quiet); font-size: 13px; }
+STYLE = r"""
+/* --- instrument readouts --------------------------------------------------- */
+.totals { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-top: 54px; counter-reset: readout; }
+@media (max-width: 980px) { .totals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.total { position: relative; padding: 34px 16px 16px; background: var(--panel); border: 1px solid var(--line);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%); counter-increment: readout; }
+.total::before { content: "R-" counter(readout, decimal-leading-zero); position: absolute; top: 12px; left: 16px;
+  font: 500 10px/1 var(--mono); letter-spacing: 0.14em; color: var(--faint); }
+.total::after { content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: 34%; background: var(--line-hi); }
+.total b { display: block; font: 600 clamp(30px, 3.6vw, 44px)/1 var(--display); letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums; color: var(--ink); }
+.total span { display: block; margin-top: 10px; font: 500 10.5px/1.35 var(--display); letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--quiet); }
+.total.good b { color: var(--specimen); text-shadow: 0 0 24px rgba(111, 242, 166, 0.35); }
+.total.good::after { background: var(--specimen); width: 100%; }
+
+/* --- specimen cards: toe tags for retired features ----------------------- */
+.stones { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 22px; padding-top: 10px; }
+.stone { position: relative; padding: 26px 24px 0 58px; background: var(--panel); border: 1px solid var(--line);
+  clip-path: polygon(0 18px, 18px 0, 100% 0, 100% 100%, 0 100%); transition: border-color .2s, transform .3s var(--ease); }
+.stone:hover { border-color: var(--line-hi); transform: translateY(-3px); }
+.stone::before { content: ""; position: absolute; left: 20px; top: 26px; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--hazard); box-shadow: 0 0 0 4px var(--hazard-soft); }
+.stone::after { content: ""; position: absolute; left: 26px; top: 42px; bottom: 0; width: 2px;
+  background: repeating-linear-gradient(var(--line-hi) 0 4px, transparent 4px 8px); }
+.stone .rip { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+  font: 600 10.5px/1 var(--display); letter-spacing: 0.28em; color: var(--quiet); }
+.stone .rip::after { content: "DECEASED"; color: var(--alarm); border: 2px solid var(--alarm); padding: 5px 8px 4px;
+  letter-spacing: 0.24em; transform: rotate(-6deg); opacity: .9; }
+.stone h3 { margin: 0; font: 700 clamp(24px, 2.6vw, 30px)/1.05 var(--display); letter-spacing: 0.01em;
+  text-transform: uppercase; overflow-wrap: anywhere; color: var(--ink); }
+.stone .route { margin-top: 8px; font: 500 12.5px/1 var(--mono); color: var(--scan); }
+.stone .dates { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 18px 0; padding: 12px 0;
+  border-top: 1px dashed var(--line-hi); border-bottom: 1px dashed var(--line-hi);
+  font: 500 12px/1.4 var(--mono); color: var(--ink); }
+.stone .dates::before { content: "LIFESPAN"; font: 600 10px/1.6 var(--display); letter-spacing: 0.2em; color: var(--faint); }
+.stone .cause { margin: 0 0 18px; font-size: 13px; line-height: 1.6; color: var(--quiet); }
+.stone .cause::before { content: "CAUSE OF DEATH // "; display: block; margin-bottom: 4px;
+  font: 600 10px/1 var(--display); letter-spacing: 0.2em; color: var(--hazard); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.chip { padding: 5px 8px; font: 500 11px/1 var(--mono); color: var(--ink); background: var(--panel-hi); border: 1px solid var(--line);
+  font-variant-numeric: tabular-nums; }
+.chip.good { color: var(--specimen); border-color: rgba(111, 242, 166, 0.35); background: var(--specimen-soft); }
+.pending { color: var(--hazard); font-size: 12.5px; margin: 0 0 18px; }
+.links { display: flex; flex-wrap: wrap; gap: 0; margin: 0 -24px 0 -58px; border-top: 1px solid var(--line); }
+.links a { flex: 1 1 auto; padding: 12px 10px; text-align: center; font: 600 10.5px/1 var(--display); letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--quiet); border-right: 1px solid var(--line); }
+.links a:last-child { border-right: 0; }
+.links a::after { content: " \2192"; }
+.links a:hover { color: var(--bg); background: var(--hazard); }
+.links::after { content: ""; flex: 0 0 100%; height: 18px;
+  background: repeating-linear-gradient(90deg, var(--line-hi) 0 2px, transparent 2px 5px, var(--line-hi) 5px 6px, transparent 6px 9px); opacity: .5; }
 """
 
 
@@ -168,13 +161,19 @@ def nav(current: str) -> str:
         f"<a href='{href}'{' aria-current=\"page\"' if label == current else ''}>{label}</a>"
         for label, href in links
     )
-    return f"<nav><a class='brand' href='/'>SHELF</a>{items}</nav>"
+    watch = "<span class='watch'><b>&#9679;</b>MONITORING</span>"
+    return f"<nav><a class='brand' href='/'><i></i>SHELF<small>// AFTERLIFE LAB</small></a>{items}{watch}</nav>"
+
+
+SECTION_NUMBERS = {"live": "01", "retired": "02", "hibernating": "03", "resurrected": "04",
+                   "protected": "05", "census": "06"}
 
 
 def _h2(title: str, count: int | None = None, anchor: str = "") -> str:
     shown = "" if count is None else f"<span class='count'>{count}</span>"
     ident = f" id='{anchor}'" if anchor else ""
-    return f"<h2{ident}>{escape(title)}{shown}</h2>"
+    number = f" data-index='{SECTION_NUMBERS[anchor]}'" if anchor in SECTION_NUMBERS else ""
+    return f"<h2{ident}{number}>{escape(title)}{shown}</h2>"
 
 
 def _when(value) -> str:
@@ -256,7 +255,7 @@ def _table(entries: list[dict], columns: list[tuple[str, str]], empty: str,
         "<tr>" + "".join(f"<td{cls(key)}>{cell(entry, key)}</td>" for _, key in columns) + "</tr>"
         for entry in entries
     )
-    return f"<div class='scroll'><table><tr>{head}</tr>{rows}</table></div>"
+    return f"<div class='scroll' data-reveal><table><tr>{head}</tr>{rows}</table></div>"
 
 
 def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = None,
@@ -265,22 +264,24 @@ def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = N
     stones = ("".join(_stone(tomb, savings) for tomb in ledger["retired"])
               or "<p class='empty'>Nothing retired yet.</p>")
     live = ("" if timeline_html is None else
-            _h2("Retirements, live", anchor="live")
-            + "<p class='lead'>Each stage is a GitLab job; click one to open it. "
+            _h2("Active cases", anchor="live")
+            + "<p class='lead'>Each retirement is a case moving through the lab. Every stage is a real GitLab job; click one to open it. "
             f"This section refreshes every {timeline.REFRESH_MS // 1000} seconds.</p>"
-            f"<section id='timeline'>{timeline_html}</section>")
+            f"<section id='timeline' data-reveal>{timeline_html}</section>")
     protected = {p.get("feature") for p in ledger["protected"]}
     mono = {"route": lambda e: f"<span class='mono'>{escape(str(e.get('route', '')))}</span>"}
     feature = {"feature": lambda e: f"<b>{escape(str(e.get('feature', '')))}</b>"}
     return (
-        "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
-        "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-        f"<title>Graveyard</title><style>{STYLE}{timeline.STYLE}</style></head><body><main>"
+        theme.head("Graveyard &middot; Shelf", STYLE + timeline.STYLE) + "<main>"
         + nav("Graveyard")
-        + "<h1>Graveyard</h1>"
-        "<p class='lead'>Features AFTERLIFE retired from Shelf, what each one cost while it was alive, "
-        "and the ones it chose to keep.</p>"
-        "<section class='totals'>"
+        + "<header class='hero'>"
+        + theme.case_header("CASE AFT-0001", "Shelf &middot; morgue register")
+        + "<div class='eyebrow'>Cause of death</div>"
+        "<h1>Nobody <em>used it.</em></h1>"
+        "<p class='lead'>Every feature AFTERLIFE retired from Shelf, what each one cost while it was alive, "
+        "and the ones it chose to keep. <em>Every number was measured by a CI job, never guessed.</em></p>"
+        "</header>"
+        "<section class='totals' data-reveal>"
         + _total("features retired", t["retired"])
         + _total("lines removed", t["lines_removed"])
         + _total("dependencies removed", t["deps_removed"])
@@ -289,21 +290,21 @@ def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = N
         + _total("gCO2e saved per pipeline run", t["sci_gco2e_saved"], digits=4, good=True)
         + "</section>"
         + live
-        + _h2("Retired", len(ledger["retired"]), "retired") + f"<section class='stones'>{stones}</section>"
+        + _h2("Deceased", len(ledger["retired"]), "retired") + f"<section class='stones' data-reveal>{stones}</section>"
         + _h2("Hibernating", len(ledger["hibernating"]), "hibernating")
-        + "<p class='lead'>Quiet, but not dead. The Coroner refused to retire these.</p>"
+        + "<p class='lead'>Quiet, but not dead. The Coroner refused to sign a death certificate.</p>"
         + _table(ledger["hibernating"], [("Feature", "feature"), ("Why it was kept", "reason"),
                                          ("Check again", "recheck"), ("Decided by", "source")],
                  "No hibernating features.", cells=feature)
         + _h2("Resurrected", len(ledger["resurrected"]), "resurrected")
-        + "<p class='lead'>Switched off for the vigil, then somebody knocked. Nothing was deleted.</p>"
+        + "<p class='lead'>Flatlined for the vigil, then somebody knocked. Revived; nothing was deleted.</p>"
         + _table(ledger["resurrected"], [("Feature", "feature"), ("Who knocked", "caller"),
                                          ("When", "knocked_at"), ("Why", "reason"), ("Check again", "recheck")],
                  "Nobody has knocked yet.",
                  cells={**feature, "caller": lambda e: f"<span class='mono'>{escape(str(e.get('caller', '')))}</span>",
                         "knocked_at": lambda e: _when(e.get("knocked_at", ""))})
         + _h2("Protected", len(ledger["protected"]), "protected")
-        + "<p class='lead'>Never auto-retired, however quiet. Policy decides, not the agents.</p>"
+        + "<p class='lead'>Never sent to the morgue, however quiet. Policy decides, not the agents.</p>"
         + _table(ledger["protected"], [("Feature", "feature"), ("Reason", "reason")], "No protected features.",
                  cells=feature)
         + _h2("Census", len(census or []), "census")
@@ -317,10 +318,12 @@ def render(ledger: dict, savings: dict[str, dict], census: list[dict] | None = N
                         "calls_in_window": lambda e: escape(_num(e["calls_in_window"])),
                         "candidate": lambda e: _census_status(e, protected)},
                  classes={"calls_in_window": "num", "days_silent": "num"})
-        + "<footer>Every number is measured by a CI job and links to it. Usage history in this demo is "
-        "simulated and labelled as such in the census.</footer>"
+        + "<footer><span class='epitaph'>End of report</span>"
+        "<span>Every number is measured by a CI job and links to it. Usage history in this demo is "
+        "simulated and labelled as such in the census.</span></footer>"
         "</main>"
         + (timeline.REFRESH_SCRIPT if timeline_html is not None else "")
+        + theme.REVEAL_SCRIPT
         + "</body></html>"
     )
 
