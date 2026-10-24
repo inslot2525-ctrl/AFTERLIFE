@@ -2,7 +2,6 @@
 
 from app.features import (
     admin_reindex,
-    books_v1,
     books_v2,
     embed_widget,
     import_goodreads,
@@ -10,7 +9,6 @@ from app.features import (
 )
 
 MODULES = [
-    books_v1,
     books_v2,
     import_goodreads,
     wrapped,
