@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acme Book Club (demo partner)</title>
+<style>
+  :root { --bg: #f4efe6; --card: #fff8ee; --ink: #2b2116; --quiet: #7a6650; --line: #ead8c3; --accent: #b5532a; --bad: #8f2a20; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #17130f; --card: #221c16; --ink: #f1e7da; --quiet: #b9a58c; --line: #3a3027; --accent: #e07a4b; --bad: #f08a7f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 16px 48px; }
+  .demo-note { border: 1px dashed var(--line); border-radius: 10px; padding: 10px 14px; color: var(--quiet); font-size: 13.5px; margin: 0 0 22px; }
+  .demo-note code { font-size: 12.5px; }
+  .site { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; }
+  h1 { font: 700 26px/1.2 Georgia, "Times New Roman", serif; margin: 0 0 4px; }
+  .tag { color: var(--quiet); margin: 0 0 18px; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; font: 600 15px system-ui, sans-serif; cursor: pointer; }
+  button:disabled { opacity: .6; cursor: wait; }
+  .slot { margin-top: 16px; min-height: 64px; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .slot ul { margin: 6px 0 0 18px; padding: 0; }
+  .slot.retired { border-color: var(--bad); color: var(--bad); }
+  .slot.empty { color: var(--quiet); }
+  .log { margin-top: 18px; font: 12.5px/1.6 ui-monospace, Consolas, monospace; color: var(--quiet); }
+  .log b { color: var(--ink); }
+</style>
+</head>
+<body>
+<main>
+  <p class="demo-note">A pretend partner website for the AFTERLIFE demo. Acme Book Club is made up. It is hosted
+    separately from Shelf (on GitLab Pages) and embeds Shelf's &ldquo;currently reading&rdquo; widget the way a real
+    partner would. Nothing is sent until you click: then it makes one request to
+    <code id="target">/embed/widget</code> with Acme's partner key. While Shelf holds a vigil for the widget, that
+    request is a knock and brings the widget back.</p>
+  <section class="site">
+    <h1>Acme Book Club</h1>
+    <p class="tag">What our members are reading this week, powered by Shelf.</p>
+    <button id="load" type="button">Load the Shelf widget</button>
+    <div id="slot" class="slot empty">The widget loads here.</div>
+  </section>
+  <div id="log" class="log" aria-live="polite"></div>
+</main>
+<script>
+(function () {
+  // The partner's key, sent as x-partner-key; Shelf's knock log shows it as the caller.
+  // scripts/traffic.py --partner uses the same key.
+  var PARTNER_KEY = 'acme-quarterly-report';
+  // Shelf's live URL; ?shelf=<url> points the demo at another deployment.
+  var SHELF_URL = (new URLSearchParams(location.search).get('shelf') || 'https://shelf-i6y2wbu2yq-lz.a.run.app').replace(/\/$/, '');
+  var widget = SHELF_URL + '/embed/widget';
+  var button = document.getElementById('load'), slot = document.getElementById('slot'), log = document.getElementById('log');
+  document.getElementById('target').textContent = widget;
+
+  function note(status, text) {
+    var row = document.createElement('div');
+    var when = document.createElement('b');
+    when.textContent = new Date().toISOString().slice(11, 19) + ' UTC';
+    row.appendChild(when);
+    row.appendChild(document.createTextNode(' GET /embed/widget → ' + status + ' ' + text));
+    log.prepend(row);
+  }
+
+  button.addEventListener('click', function () {
+    button.disabled = true;
+    fetch(widget, {headers: {'x-partner-key': PARTNER_KEY}, cache: 'no-store'})
+      .then(function (r) {
+        return r.text().then(function (body) {
+          if (r.ok) {
+            // Shelf's own widget markup: it escapes book titles before sending them.
+            slot.className = 'slot'; slot.innerHTML = body; note(r.status, 'widget shown');
+          } else if (r.status === 410) {
+            slot.className = 'slot retired';
+            slot.textContent = 'Shelf has switched this widget off while it decides whether to retire it. '
+              + 'Our request was logged as a knock, so it should come back.';
+            note(r.status, 'retired, knock logged');
+          } else {
+            slot.className = 'slot retired';
+            slot.textContent = r.status === 404 ? 'Shelf has retired this widget for good.' : 'Shelf answered ' + r.status + '.';
+            note(r.status, r.status === 404 ? 'gone' : 'error');
+          }
+        });
+      })
+      .catch(function () { note('-', 'network error'); })
+      .finally(function () { button.disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>

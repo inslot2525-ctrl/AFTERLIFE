@@ -1,6 +1,7 @@
 """Shelf: a small reading-list app with a few years of cruft, run by AFTERLIFE."""
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app import graveyard, home, partner
 from app.features import MODULES
@@ -10,6 +11,10 @@ from app.store import UsageStore, store_from_env
 
 def create_app(store: UsageStore | None = None, flags: Flags | None = None) -> FastAPI:
     app = FastAPI(title="Shelf")
+    # Partners embed the widget from their own sites (partner-site/ on GitLab Pages):
+    # public GETs only, with the partner key header; no credentials.
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"],
+                       allow_headers=["x-partner-key"])
     app.state.store = store or store_from_env()
     app.state.flags = flags or flags_from_env()
 
