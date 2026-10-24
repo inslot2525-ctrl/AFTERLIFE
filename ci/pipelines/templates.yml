@@ -1,0 +1,59 @@
+# Shared job templates and rules.
+
+.not-census:
+  rules:
+    - if: $AFTERLIFE_PIPELINE == "census"
+      when: never
+    - when: on_success
+
+.sunset:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /(^|,)afterlife::sunset(,|$)/
+
+.main:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+
+# Only on the merge commit gate-merge created ("AFTERLIFE: retire <feature> via !N").
+.retirement:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_MESSAGE =~ /AFTERLIFE: retire /'
+
+# Gate jobs need git (python:3.12-slim has none) and the app's requirements.
+.gate:
+  image: python:3.12
+  before_script:
+    - pip install -q -r requirements.txt -r requirements-dev.txt
+
+# Docker-in-Docker over plain TCP: works on the team's self-hosted runner
+# without sharing a TLS certificate volume.
+.dind:
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    # dind can take longer than the runner's 30 s service check on a laptop.
+    - for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done
+
+# GitLab OIDC -> Workload Identity Federation -> deploy service account. No keys.
+.gcp-oidc:
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://iam.googleapis.com/$WIF_PROVIDER
+
+.gate-gcp:
+  extends: [.gate, .gcp-oidc]
+  variables:
+    AFTERLIFE_STORE: firestore
+  before_script:
+    - pip install -q -r requirements.txt -r requirements-dev.txt
+    - . ci/gcp_auth.sh
+
+.gcloud:
+  extends: .gcp-oidc
+  image: google/cloud-sdk:503.0.0-slim
+  before_script:
+    - . ci/gcp_auth.sh

@@ -9,3 +9,7 @@ report.xml
 *.local.json
 .terraform/
 *.tfstate*
+infra/terraform.tfvars
+.gcp_cred.json
+.gitlab_oidc_jwt
+.ruff_cache/

@@ -1,0 +1,133 @@
+# Main pipeline (push to the default branch). Every push builds and canaries;
+# release, measure and obituary run only on an AFTERLIFE merge commit.
+
+build-push:
+  extends: [.dind, .gcp-oidc, .main]
+  stage: build
+  variables:
+    IMAGE: $AR_REPO/$SERVICE:$CI_COMMIT_SHA
+  script:
+    - apk add --no-cache curl jq >/dev/null
+    - TOKEN=$(sh ci/gcp_token.sh)
+    - echo "$TOKEN" | docker login -u oauth2accesstoken --password-stdin "https://${AR_REPO%%/*}"
+    - docker build -t "$IMAGE" .
+    - docker push "$IMAGE"
+
+deploy-canary:
+  extends: [.gcloud, .main]
+  stage: deploy
+  needs: [build-push, test]
+  environment:
+    name: production
+    url: $SHELF_URL
+  resource_group: production
+  script:
+    - |
+      describe() { gcloud run services describe "$SERVICE" --region "$GCP_REGION" --format=json; }
+      PREV=$(describe | python3 -c "import json,sys; t=json.load(sys.stdin)['status']['traffic']; print(max(t, key=lambda x: x.get('percent', 0))['revisionName'])")
+      gcloud run deploy "$SERVICE" --region "$GCP_REGION" --image "$AR_REPO/$SERVICE:$CI_COMMIT_SHA" \
+        --no-traffic --tag canary --quiet
+      REV=$(describe | python3 -c "import json,sys; print(json.load(sys.stdin)['status']['latestCreatedRevisionName'])")
+      URL=$(describe | python3 -c "import json,sys; print(next(t['url'] for t in json.load(sys.stdin)['status']['traffic'] if t.get('tag') == 'canary'))")
+      # Keep in step with policy canary.traffic_percent.
+      gcloud run services update-traffic "$SERVICE" --region "$GCP_REGION" --to-revisions "$REV=${CANARY_PERCENT:-10}" --quiet
+      printf 'PREV_REVISION=%s\nCANARY_REVISION=%s\nCANARY_URL=%s\n' "$PREV" "$REV" "$URL" | tee deploy.env
+  artifacts:
+    reports:
+      dotenv: deploy.env
+
+canary-watch:
+  extends: [.gate-gcp, .main]
+  stage: canary
+  needs: [deploy-canary]
+  script:
+    - pip install -q google-cloud-monitoring
+    - git fetch --quiet origin afterlife/census && git show origin/afterlife/census:census/latest.json > census.json || true
+    - python -m ci.canary_watch --policy afterlife/policy.yaml --census census.json
+  artifacts:
+    paths:
+      - canary.json
+    reports:
+      dotenv: canary.env
+
+promote:
+  extends: [.gcloud, .main]
+  stage: promote
+  needs: [deploy-canary, canary-watch]
+  resource_group: production
+  script:
+    - |
+      if [ "$CANARY_RESULT" != "promote" ]; then echo "Canary said $CANARY_RESULT; not promoting."; exit 0; fi
+      gcloud run services update-traffic "$SERVICE" --region "$GCP_REGION" --to-latest --quiet
+      gcloud run services update-traffic "$SERVICE" --region "$GCP_REGION" --remove-tags canary --quiet
+      echo "Promoted $CANARY_REVISION to 100%."
+
+rollback:
+  extends: [.gcloud, .main]
+  stage: promote
+  needs: [deploy-canary, canary-watch]
+  resource_group: production
+  script:
+    - |
+      if [ "$CANARY_RESULT" != "rollback" ]; then echo "Canary healthy; no rollback."; exit 0; fi
+      gcloud run services update-traffic "$SERVICE" --region "$GCP_REGION" --to-revisions "$PREV_REVISION=100" --quiet
+      python3 -m ci.rollback --canary canary.json
+      # Fail the pipeline so release, measure and obituary never run for a rolled-back retirement.
+      exit 1
+
+release-notes:
+  extends: [.gate, .retirement]
+  stage: release
+  needs: [promote, rollback]
+  script:
+    - python -m ci.release_notes
+  artifacts:
+    paths:
+      - release_notes.md
+    reports:
+      dotenv: release.env
+
+release:
+  extends: .retirement
+  stage: release
+  needs: [release-notes]
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  script:
+    - echo "Releasing $RELEASE_TAG"
+  release:
+    tag_name: $RELEASE_TAG
+    name: "Retired: $RETIRED_FEATURE"
+    description: ./release_notes.md
+    ref: $CI_COMMIT_SHA
+
+measure:
+  extends: [.gate, .retirement]
+  stage: measure
+  needs: [release-notes, release, test, vulture, build-image]
+  script:
+    - BASE=$(git rev-parse HEAD^1)
+    - git show "$BASE:requirements.txt" > requirements.before.txt
+    - pip-audit -r requirements.before.txt -f json -o audit_before.json || true
+    - pip-audit -r requirements.txt -f json -o audit_after.json || true
+    - python -m ci.runner_minutes --base "$BASE" --out runner_minutes.json
+    # Both sizes from the registry API (compressed), so they compare like for like.
+    - BEFORE=$(python -m ci.gitlab image-size --tag "$(git rev-parse --short=8 "$BASE")" || true)
+    - AFTER=$(python -m ci.gitlab image-size --tag "$CI_COMMIT_SHORT_SHA" || true)
+    - >
+      python -m ci.measure --feature "$RETIRED_FEATURE" --mr-iid "$MR_IID" --base "$BASE"
+      --audit-before audit_before.json --audit-after audit_after.json
+      ${BEFORE:+--image-before "$BEFORE"} ${AFTER:+--image-after "$AFTER"} --minutes runner_minutes.json
+  artifacts:
+    paths:
+      - savings.json
+      - audit_before.json
+      - audit_after.json
+      - runner_minutes.json
+
+obituary:
+  extends: [.gate, .retirement]
+  stage: measure
+  needs: [measure, release-notes]
+  script:
+    - export RELEASE_URL="$CI_PROJECT_URL/-/releases/$RELEASE_TAG"
+    - python -m ci.obituary --savings savings.json

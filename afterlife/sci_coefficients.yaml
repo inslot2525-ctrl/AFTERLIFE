@@ -1,0 +1,32 @@
+# Coefficients for the SCI estimate. Every value MUST carry a source.
+# measure.py refuses to compute SCI while a required value is null, and
+# still reports the measured deltas (lines, deps, CVEs, image MB, minutes).
+#
+# The compute and memory values below follow the Cloud Carbon Footprint
+# methodology for GCP (https://www.cloudcarbonfootprint.org/docs/methodology).
+# VERIFY against the current page and cite the date in docs/sci.md.
+version: 1
+source_checked_on: null            # e.g. 2026-10-25
+
+compute:
+  min_watts_per_vcpu: 0.71         # CCF, GCP average
+  max_watts_per_vcpu: 4.26         # CCF, GCP average
+  assumed_utilisation: 0.5         # stated assumption, not measured
+memory_kwh_per_gb_hour: 0.000392   # CCF
+pue: 1.1                           # CCF, GCP
+
+# Grid intensity of the chosen region, gCO2e/kWh, from a public dataset.
+# Om fills this on day 1 together with the region choice.
+grid:
+  region: europe-north1            # Finland, 98% Google CFE (2025)
+  gco2e_per_kwh: 30                # grid intensity, Google 2025 data
+  source: https://cloud.google.com/sustainability/region-carbon (2025 data, checked 2026-10-24)
+
+# Embodied emissions share; an estimate, labelled as such in the write-up.
+embodied:
+  gco2e_per_vcpu_hour: null
+  source: null
+
+runner:
+  vcpus: 2                         # GitLab.com small SaaS runner; verify
+  memory_gb: 8

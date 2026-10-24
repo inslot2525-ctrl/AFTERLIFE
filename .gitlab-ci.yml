@@ -1,18 +1,50 @@
-# AFTERLIFE pipeline. This is the first slice: test, secure, build.
-# Still to add (see the build plan): census schedule, verdict-check, coma,
-# vigil, resurrect, gate-merge, release, deploy-canary, canary-watch,
-# promote/rollback, measure, obituary.
+# AFTERLIFE pipelines. One file of shared jobs, plus three flows chosen by rules:
+#   census   schedule (or manual run) with AFTERLIFE_PIPELINE=census     ci/pipelines/census.yml
+#   sunset   merge request labelled afterlife::sunset                    ci/pipelines/sunset.yml
+#            verdict-check -> review-check -> coma -> vigil -> resurrect | gate-merge
+#   main     push to the default branch                                  ci/pipelines/main.yml
+#            build-push -> deploy-canary -> canary-watch -> promote | rollback,
+#            and on an AFTERLIFE merge: release, measure, obituary
+# terraform plan runs on any MR touching infra/                          ci/pipelines/infra.yml
+#
+# CI/CD variables are listed in docs/runbook-om.md.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    # The census branch only holds census files.
+    - if: $CI_COMMIT_BRANCH == "afterlife/census"
+      when: never
+    # A branch with an open MR gets the MR pipeline instead.
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
 
 stages:
+  - census
   - test
   - secure
   - build
+  - verdict
+  - coma
+  - vigil
+  - merge
+  - deploy
+  - canary
+  - promote
+  - release
+  - measure
 
 default:
   image: python:3.12-slim
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  SERVICE: shelf
+  GOOGLE_CLOUD_PROJECT: $GCP_PROJECT_ID
+  AST_ENABLE_MR_PIPELINES: "true"   # SAST and secret detection in MR pipelines too
 
 cache:
   key: pip
@@ -22,13 +54,18 @@ cache:
 include:
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - local: ci/pipelines/templates.yml
+  - local: ci/pipelines/census.yml
+  - local: ci/pipelines/sunset.yml
+  - local: ci/pipelines/main.yml
+  - local: ci/pipelines/infra.yml
 
 .python:
   before_script:
     - pip install -r requirements.txt -r requirements-dev.txt
 
 test:
-  extends: .python
+  extends: [.python, .not-census]
   stage: test
   script:
     - pytest --junitxml=report.xml
@@ -38,13 +75,13 @@ test:
       junit: report.xml
 
 vulture:
-  extends: .python
+  extends: [.python, .not-census]
   stage: test
   script:
     - vulture app/ --min-confidence 80 --exclude app/tests
 
 dependency-audit:
-  extends: .python
+  extends: [.python, .not-census]
   stage: secure
   script:
     # Reports, never blocks: requests is pinned to a vulnerable version on
@@ -57,20 +94,10 @@ dependency-audit:
       - pip-audit.json
 
 build-image:
+  extends: [.dind, .not-census]
   stage: build
-  image: docker:27
-  services:
-    - docker:27-dind
-  variables:
-    # Plain TCP to the dind service: works on the team's self-hosted runner
-    # without sharing a TLS certificate volume.
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
-  before_script:
-    # dind can take longer than the runner's 30 s service check on a laptop.
-    - for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
   script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" .
     - docker image inspect "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" --format '{{.Size}}' > image-size.txt
     - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"

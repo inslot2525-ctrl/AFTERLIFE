@@ -1,0 +1,117 @@
+# Sunset MR pipeline (label afterlife::sunset). Nothing is switched off until
+# tests, scans and both gates pass; nothing merges until the vigil is silent.
+# The feature comes from the branch name: afterlife/<feature>.
+
+.feature:
+  script:
+    - export FEATURE="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME#afterlife/}"
+    - python -c "from ci.gitlab import feature_from_branch as f; f('$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME')"
+
+vulture-recheck:
+  extends: [.gate, .sunset]
+  stage: test
+  script:
+    - git fetch --quiet origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - git worktree add --quiet /tmp/target "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - (cd /tmp/target && vulture app/ --min-confidence 60 --exclude app/tests || true) > vulture_target.txt
+    - (vulture app/ --min-confidence 60 --exclude app/tests || true) > vulture_mr.txt
+    - python -m ci.diff_checks vulture vulture_target.txt vulture_mr.txt
+
+pip-audit-diff:
+  extends: [.gate, .sunset]
+  stage: secure
+  script:
+    - git fetch --quiet origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - git show "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME:requirements.txt" > requirements.target.txt
+    - pip-audit -r requirements.target.txt -f json -o audit_target.json || true
+    - pip-audit -r requirements.txt -f json -o audit_mr.json || true
+    - python -m ci.diff_checks pip-audit audit_target.json audit_mr.json
+  artifacts:
+    when: always
+    paths:
+      - cves.json
+      - audit_target.json
+      - audit_mr.json
+
+verdict-check:
+  extends: [.gate, .sunset]
+  stage: verdict
+  script:
+    - !reference [.feature, script]
+    - git fetch --quiet origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" afterlife/census
+    # Policy from the target branch, so the MR can't loosen the rules that judge it.
+    - git show "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME:afterlife/policy.yaml" > target-policy.yaml
+    - git show origin/afterlife/census:census/latest.json > census.json
+    - git diff --name-only "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD" > changed.txt
+    - python -m ci.gitlab mr-description --out mr.md
+    - python -m ci.verdict_check --description mr.md --census census.json --policy target-policy.yaml --changed-files changed.txt
+  artifacts:
+    paths:
+      - target-policy.yaml
+      - census.json
+      - changed.txt
+
+review-check:
+  extends: [.gate, .sunset]
+  stage: verdict
+  timeout: 30m
+  script:
+    - python -m ci.review_check --wait-minutes 20
+
+coma:
+  extends: [.gate, .sunset]
+  stage: coma
+  needs:
+    - verdict-check
+    - review-check
+    - test
+    - vulture-recheck
+    - pip-audit-diff
+    - build-image
+    - job: secret_detection
+      optional: true
+    - job: semgrep-sast
+      optional: true
+  environment:
+    name: production
+    action: access
+  resource_group: production-flags
+  script:
+    - !reference [.feature, script]
+    - python -m ci.coma --feature "$FEATURE"
+
+vigil:
+  extends: [.gate-gcp, .sunset]
+  stage: vigil
+  needs: [coma, verdict-check]
+  timeout: 2h
+  script:
+    - !reference [.feature, script]
+    - python -m ci.vigil --feature "$FEATURE" --policy target-policy.yaml ${VIGIL_MINUTES:+--minutes "$VIGIL_MINUTES"}
+  artifacts:
+    when: always
+    paths:
+      - vigil.json
+
+# Runs only when the vigil failed: on a knock, vigil.py exits 1.
+resurrect:
+  extends: [.gate, .sunset]
+  stage: merge
+  needs: [vigil]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /(^|,)afterlife::sunset(,|$)/
+      when: on_failure
+  environment:
+    name: production
+    action: access
+  resource_group: production-flags
+  script:
+    - python -m ci.resurrect --vigil vigil.json
+
+gate-merge:
+  extends: [.gate, .sunset]
+  stage: merge
+  needs: [verdict-check, vigil]
+  script:
+    - !reference [.feature, script]
+    - python -m ci.gate_merge --feature "$FEATURE" --vigil vigil.json --policy target-policy.yaml --changed-files changed.txt

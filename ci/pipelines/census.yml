@@ -1,0 +1,15 @@
+# Census pipeline (Monitor). Schedule it daily with AFTERLIFE_PIPELINE=census,
+# or run it by hand from CI/CD > Pipelines > Run pipeline with that variable.
+
+census:
+  extends: .gate-gcp
+  stage: census
+  rules:
+    - if: $AFTERLIFE_PIPELINE == "census"
+  script:
+    - python -m ci.census --out census/latest.json --vulture
+    - sh ci/push_census.sh
+  artifacts:
+    paths:
+      - census/latest.json
+    expire_in: 90 days

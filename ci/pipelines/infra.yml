@@ -1,0 +1,43 @@
+# terraform plan on any MR touching infra/, posted to the MR (Configure stage).
+# Apply runs from Om's machine until feature freeze (docs/runbook-om.md).
+
+terraform-plan:
+  extends: .gcp-oidc
+  stage: test
+  image:
+    name: hashicorp/terraform:1.9.8
+    entrypoint: [""]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [infra/**/*]
+  variables:
+    DEPLOY_SA: $TF_PLAN_SA   # the read-only service account
+    TF_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/afterlife
+    TF_VAR_project_id: $GCP_PROJECT_ID
+    TF_VAR_region: $GCP_REGION
+    TF_VAR_gitlab_project_path: $CI_PROJECT_PATH
+  script:
+    - . ci/gcp_auth.sh
+    - cd infra
+    - >
+      terraform init -input=false
+      -backend-config="address=$TF_ADDRESS"
+      -backend-config="lock_address=$TF_ADDRESS/lock"
+      -backend-config="unlock_address=$TF_ADDRESS/lock"
+      -backend-config="username=gitlab-ci-token" -backend-config="password=$CI_JOB_TOKEN"
+      -backend-config="lock_method=POST" -backend-config="unlock_method=DELETE"
+    - terraform fmt -check -recursive
+    - terraform validate
+    - terraform plan -input=false -lock=false -no-color | tee ../plan.txt
+  artifacts:
+    paths:
+      - plan.txt
+
+terraform-plan-comment:
+  stage: secure
+  needs: [terraform-plan]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: [infra/**/*]
+  script:
+    - python -m ci.post_note plan.txt "terraform plan for infra/"
