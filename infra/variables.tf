@@ -37,3 +37,9 @@ variable "unleash_instance_id" {
   default     = ""
   description = "GitLab feature flags instance ID. Not a secret, but not a password either."
 }
+
+variable "gitlab_read_token_enabled" {
+  type        = bool
+  default     = false
+  description = "Expose the afterlife-gitlab-read-token secret to Shelf. Set true after adding a secret version."
+}

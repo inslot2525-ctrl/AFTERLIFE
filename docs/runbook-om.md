@@ -135,3 +135,18 @@ Cloud Run and Firestore are both available there. Latency from India doesn't mat
 - **Embodied carbon coefficient is null.** SCI says "not computed" until it has a cited value.
 - **Image size before/after** uses the registry's compressed sizes for both commits.
 - **Nothing here has run on GitLab or GCP yet.** Only unit tests and YAML reference checks ran locally.
+
+## Read-only GitLab token for the graveyard (Secret Manager)
+
+GitLab hides issue comments from anonymous API calls, so `/graveyard`'s live timeline and
+verdicts need a `read_api` token. It lives only in Secret Manager:
+
+1. Settings → Access tokens: name `graveyard-read`, role **Reporter**, scope **read_api** only.
+2. In Cloud Shell, after `terraform apply` has created the `afterlife-gitlab-read-token` secret:
+   ```sh
+   read -rsp 'read_api token: ' T && printf '%s' "$T" | gcloud secrets versions add afterlife-gitlab-read-token --data-file=- && unset T
+   echo 'gitlab_read_token_enabled = true' >> ~/AFTERLIFE/infra/terraform.tfvars
+   cd ~/AFTERLIFE/infra && /usr/bin/terraform apply -auto-approve
+   ```
+3. Shelf reads it as `AFTERLIFE_GITLAB_READ_TOKEN`. CI deploys keep the setting.
+   To rotate, add a new version; `latest` is used on the next revision.

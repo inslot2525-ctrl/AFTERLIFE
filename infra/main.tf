@@ -8,6 +8,7 @@ locals {
     "sts.googleapis.com",
     "monitoring.googleapis.com",
     "cloudresourcemanager.googleapis.com",
+    "secretmanager.googleapis.com",
   ]
 }
 
@@ -65,6 +66,24 @@ resource "google_project_iam_member" "runtime_firestore" {
   member  = "serviceAccount:${google_service_account.runtime.email}"
 }
 
+# Read-only GitLab token (read_api) for the graveyard's live timeline and
+# verdicts. Terraform owns the secret, never its value: the version is added
+# with `gcloud secrets versions add` (docs/runbook-om.md), so the token is in
+# neither git nor Terraform state.
+resource "google_secret_manager_secret" "gitlab_read_token" {
+  secret_id = "afterlife-gitlab-read-token"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_iam_member" "runtime_reads_gitlab_token" {
+  secret_id = google_secret_manager_secret.gitlab_read_token.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime.email}"
+}
+
 resource "google_cloud_run_v2_service" "shelf" {
   name                = var.service_name
   location            = var.region
@@ -107,6 +126,20 @@ resource "google_cloud_run_v2_service" "shelf" {
         name  = "AFTERLIFE_STORE"
         value = "firestore"
       }
+      # Only once the secret has a version: Cloud Run refuses a revision whose
+      # secret has none.
+      dynamic "env" {
+        for_each = var.gitlab_read_token_enabled ? [1] : []
+        content {
+          name = "AFTERLIFE_GITLAB_READ_TOKEN"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.gitlab_read_token.secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
     }
   }
 
@@ -119,7 +152,7 @@ resource "google_cloud_run_v2_service" "shelf" {
       client_version,
     ]
   }
-  depends_on = [google_project_service.apis]
+  depends_on = [google_project_service.apis, google_secret_manager_secret_iam_member.runtime_reads_gitlab_token]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "public" {
