@@ -1,11 +1,8 @@
 # Census pipeline (Monitor). Schedule it daily with AFTERLIFE_PIPELINE=census,
 # or run it by hand from CI/CD > Pipelines > Run pipeline with that variable.
 
-census:
-  extends: .gate-gcp
+.census:
   stage: census
-  rules:
-    - if: $AFTERLIFE_PIPELINE == "census"
   script:
     - python -m ci.census --out census/latest.json --vulture
     - sh ci/push_census.sh
@@ -13,3 +10,21 @@ census:
     paths:
       - census/latest.json
     expire_in: 90 days
+
+# Production usage from Firestore, once Google Cloud is configured.
+census:
+  extends: [.gate-gcp, .census]
+  rules:
+    - if: $AFTERLIFE_PIPELINE == "census" && $GCP_PROJECT_ID
+
+# Until then: the seeded history alone, every call marked simulated, so the
+# Coroner flow can still run. The census reports the simulated share.
+census-seeded:
+  extends: [.gate, .census]
+  rules:
+    - if: $AFTERLIFE_PIPELINE == "census" && $GCP_PROJECT_ID == null
+  variables:
+    AFTERLIFE_STORE: json:census-seed.local.json
+  script:
+    - python -m scripts.seed_history
+    - !reference [.census, script]
