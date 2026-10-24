@@ -7,7 +7,8 @@ run before submitting; leave nothing invented.
 
 **Links:**
 - GitLab project: https://gitlab.com/afterlife-transcend/AFTERLIFE
-- Live app on Google Cloud: [FILL: SHELF_URL]/graveyard
+- Live app on Google Cloud: https://shelf-i6y2wbu2yq-lz.a.run.app/graveyard
+- Demo partner site (GitLab Pages): https://afterlife-8f33d1.gitlab.io/
 - Demo video: [FILL: YouTube link]
 
 ---
@@ -75,13 +76,19 @@ file that implements it.
 
 ## Accomplishments that we're proud of
 
-- The agents decide, and plain code with tests checks every decision before anything changes. [FILL: test count] tests
-  cover the gates.
-- The system says when it's wrong. A resurrection is a first-class outcome, not a failure.
+- It ran for real, end to end. Two features retired with no human step after the census issue: `books_v1` (!1) and
+  `import_goodreads` (!2), each merged by CI, canaried on Cloud Run, released and given an obituary. A third,
+  `embed_widget` (!3), was switched off, a partner knocked during its vigil, and it came back automatically.
+- The agents decide, and plain code with tests checks every decision before anything changes. 106 tests cover the
+  gates, the app and the agents' contract with CI.
+- The system says when it's wrong. A resurrection is a first-class outcome, not a failure. Duo Code Review, as a
+  second reviewer on every Sunset MR, caught a deleted general test on the first run, and we fixed the Undertaker.
 - Nothing is invented: every number on the Graveyard page links to the CI job that measured it, and simulated demo
   traffic is labelled as simulated.
-- From the demo run: [FILL: lines removed] lines, [FILL: n] dependencies and [FILL: n] CVEs removed;
-  image [FILL: before → after] MB.
+- Measured across the two retirements: 98 lines removed, the vulnerable `requests==2.31.0` pin and its 3 CVEs
+  removed (PYSEC-2026-1872, -1873, -2275), and 0.0204 gCO2e saved per pipeline run. The image did not shrink
+  (70.5 → 70.6 MB): Google's client libraries still need `requests`, at a patched version, and we report that as
+  measured.
 
 ## What we learned
 
@@ -101,8 +108,10 @@ and safer.
 We measure Software Carbon Intensity (Green Software Foundation, ISO/IEC 21031:2024) with one CI pipeline run as the
 functional unit, because every retirement shrinks every future pipeline. Coefficients come from the Cloud Carbon
 Footprint methodology and Google's 2025 region carbon data, each with a source, in `afterlife/sci_coefficients.yaml`.
-Our measured baseline is 2.48 gCO2e per pipeline run. The demo retirements took it to [FILL: after] gCO2e
-([FILL: delta] per run). Design choices: serving from `europe-north1` (30 gCO2e/kWh against 598 for Mumbai), Cloud
+CI measures each retirement like for like (the same jobs, before and after, on the same runner): `books_v1` took a
+pipeline run from 1.3949 to 1.3813 gCO2e (−0.0136), and `import_goodreads` from 1.3746 to 1.3678 gCO2e (−0.0068),
+0.0204 gCO2e per run together. The saving is small per run and permanent: every future pipeline does less. Design
+choices: serving from `europe-north1` (30 gCO2e/kWh against 598 for Mumbai), Cloud
 Run scaling to zero, deterministic scripts instead of LLM calls for every check, and agents that run only when there is
 work. Method, sources and limits: `docs/sci.md`.
 

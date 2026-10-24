@@ -56,6 +56,21 @@ Each retirement's before and after SCI comes from the `measure` job and appears 
 on the live [`/graveyard`](../app/graveyard.py) page, linked to the job that measured it. We don't project savings we
 haven't measured.
 
+## Measured retirements
+
+The `measure` job compares the same set of jobs before and after a retirement, so its per-run figures are lower than
+the full-pipeline baseline above.
+
+| Retirement | Lines removed | Dependencies / CVEs removed | Image | SCI per pipeline run | Measured by |
+| --- | --- | --- | --- | --- | --- |
+| `books_v1` (!1) | 26 | none | not measured | 1.3949 → 1.3813 gCO2e (−0.0136) | [job 17441216925](https://gitlab.com/afterlife-transcend/AFTERLIFE/-/jobs/17441216925) |
+| `import_goodreads` (!2) | 72 | `requests==2.31.0` pin; 3 CVEs (PYSEC-2026-1872, -1873, -2275) | 70.5 → 70.6 MB | 1.3746 → 1.3678 gCO2e (−0.0068) | [job 17441604134](https://gitlab.com/afterlife-transcend/AFTERLIFE/-/jobs/17441604134) |
+| **Total** | **98** | **1 pin, 3 CVEs** | | **−0.0204 gCO2e per run** | |
+
+**Why the image didn't shrink:** removing the importer removed the vulnerable `requests` pin, but `google-api-core`
+(used by the Firestore client) requires `requests>=2.33.0`, so a patched `requests` is still installed. The CVEs are
+gone because the patched version fixes them; the bytes are not.
+
 ## Design choices that cut carbon
 
 | Choice | Effect |
