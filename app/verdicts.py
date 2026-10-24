@@ -70,16 +70,19 @@ def with_verdicts(ledger: dict, verdicts: list[dict], issue: dict | None) -> dic
     return {**ledger, "hibernating": hibernating}
 
 
-_cache: dict = {"at": 0.0, "value": ([], None)}
+_cache: dict = {"at": 0.0, "value": ([], None), "loaded": False}
 
 
 def cached_verdicts(fetch: Fetch = gitlab_fetch) -> tuple[list[dict], dict | None]:
     """Shared by every viewer for CACHE_SECONDS; empty if GitLab can't be read."""
     if os.environ.get("AFTERLIFE_TIMELINE") == "off" or not os.environ.get("AFTERLIFE_GITLAB_READ_TOKEN"):
         return [], None
-    if time.monotonic() - _cache["at"] >= CACHE_SECONDS:
+    # A fresh Cloud Run container's monotonic clock starts near 0, so "at" alone
+    # would hide the verdicts for the first minute after every cold start.
+    if not _cache["loaded"] or time.monotonic() - _cache["at"] >= CACHE_SECONDS:
         try:
             _cache["value"] = latest_verdicts(fetch)
+            _cache["loaded"] = True
         except (urllib.error.URLError, TimeoutError, KeyError, ValueError, TypeError):
             pass  # keep the last known verdicts
         _cache["at"] = time.monotonic()

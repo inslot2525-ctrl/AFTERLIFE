@@ -117,3 +117,16 @@ def test_tombstone_shows_measured_image_sizes_not_a_negative_saving():
                                  "image_mb_saved": -0.2}}
     html = render(LEDGER, grew)
     assert "image 70.5 → 70.6 MB" in html and "-0.2 MB image saved" not in html
+
+
+def test_verdicts_load_on_first_request_after_a_cold_start(monkeypatch):
+    from app import verdicts
+
+    monkeypatch.setenv("AFTERLIFE_GITLAB_READ_TOKEN", "test")
+    monkeypatch.setattr(verdicts, "_cache", {"at": 0.0, "value": ([], None), "loaded": False})
+    monkeypatch.setattr(verdicts.time, "monotonic", lambda: 3.0)  # container up 3 s
+    issue = {"iid": 2, "title": "AFTERLIFE census 2"}
+    note = {"body": '```afterlife-verdict\n{"feature": "wrapped", "verdict": "HIBERNATING"}\n```'}
+    fetch = lambda path: [issue] if path.startswith("/issues?") else [note]  # noqa: E731
+    found, source = verdicts.cached_verdicts(fetch)
+    assert [v["feature"] for v in found] == ["wrapped"] and source["iid"] == 2
