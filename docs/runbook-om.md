@@ -75,7 +75,7 @@ terraform output   # copy into the CI/CD variables below
 ```
 
 **Pass:** a push to `main` runs `build-push → deploy-canary → canary-watch → promote`, and
-`SHELF_URL/healthz` answers 200.
+`SHELF_URL/health` answers 200 (not `/healthz`: Cloud Run reserves paths ending in `z`).
 
 ## Spike 2: CI merges an MR with a project access token, pinned to SHA
 

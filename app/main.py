@@ -18,8 +18,11 @@ def create_app(store: UsageStore | None = None, flags: Flags | None = None) -> F
     app.include_router(graveyard.router)
     app.include_router(home.router)
 
+    # /health is what Cloud Run checks: it reserves paths ending in "z", so /healthz
+    # never reaches the app there. /healthz stays for local runs.
+    @app.get("/health")
     @app.get("/healthz")
-    def healthz() -> dict:
+    def health() -> dict:
         return {"ok": True}
 
     return app

@@ -47,6 +47,11 @@ def test_flag_back_on_restores_feature(client, flags):
     assert client.get("/v1/books").status_code == 200
 
 
+def test_health_answers_on_a_path_cloud_run_does_not_reserve(client):
+    assert client.get("/health").json() == {"ok": True}
+    assert client.get("/healthz").status_code == 200  # local runs
+
+
 def test_goodreads_import_from_text(client):
     csv_text = "Title,Author,Exclusive Shelf\nDune,Frank Herbert,read\n"
     response = client.post("/import/goodreads", json={"csv_text": csv_text})

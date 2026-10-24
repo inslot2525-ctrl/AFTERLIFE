@@ -2,7 +2,7 @@
 promote or rollback. Writes canary.json and canary.env (CANARY_RESULT).
 
 Signals: 5xx rate and p95 latency of the canary revision from Cloud
-Monitoring, plus a synthetic check on the revision's tagged URL: /healthz must
+Monitoring, plus a synthetic check on the revision's tagged URL: /health must
 answer 200, and a feature retired by this merge must be gone.
 
     python -m ci.canary_watch --policy target-policy.yaml --census census.json
@@ -58,7 +58,8 @@ def http_status(url: str) -> int:
 
 
 def synthetic_ok(base_url: str, retired_route: str | None) -> bool:
-    if http_status(f"{base_url}/healthz") != 200:
+    # Not /healthz: Cloud Run reserves paths ending in "z" and answers them itself with 404.
+    if http_status(f"{base_url}/health") != 200:
         return False
     if retired_route:
         # /wrapped/{year} -> /wrapped/2025; the route must no longer exist (or be flagged off).
@@ -68,20 +69,23 @@ def synthetic_ok(base_url: str, retired_route: str | None) -> bool:
     return True
 
 
-def revision_metrics(project: str, service: str, revision: str, minutes: int) -> tuple[int, int, float | None]:
+def revision_metrics(project: str, service: str, revision: str, minutes: int,
+                     client=None) -> tuple[int, int, float | None]:
     from google.cloud import monitoring_v3
 
-    client = monitoring_v3.MetricServiceClient()
+    client = client or monitoring_v3.MetricServiceClient()
     end = dt.datetime.now(dt.timezone.utc)
     interval = monitoring_v3.TimeInterval(end_time=end, start_time=end - dt.timedelta(minutes=minutes))
     scope = (f'resource.type="cloud_run_revision" AND resource.labels.service_name="{service}" '
              f'AND resource.labels.revision_name="{revision}"')
+    full = monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL
 
+    # list_time_series takes its options as one request; aggregation is not a keyword argument.
     requests = errors = 0
-    for series in client.list_time_series(
-        name=f"projects/{project}", interval=interval,
-        filter=f'metric.type="run.googleapis.com/request_count" AND {scope}',
-    ):
+    for series in client.list_time_series(request={
+        "name": f"projects/{project}", "interval": interval, "view": full,
+        "filter": f'metric.type="run.googleapis.com/request_count" AND {scope}',
+    }):
         n = sum(point.value.int64_value for point in series.points)
         requests += n
         if series.metric.labels.get("response_code_class") == "5xx":
@@ -92,10 +96,10 @@ def revision_metrics(project: str, service: str, revision: str, minutes: int) ->
         alignment_period={"seconds": minutes * 60},
         per_series_aligner=monitoring_v3.Aggregation.Aligner.ALIGN_PERCENTILE_95,
     )
-    for series in client.list_time_series(
-        name=f"projects/{project}", interval=interval, aggregation=aggregation,
-        filter=f'metric.type="run.googleapis.com/request_latencies" AND {scope}',
-    ):
+    for series in client.list_time_series(request={
+        "name": f"projects/{project}", "interval": interval, "view": full, "aggregation": aggregation,
+        "filter": f'metric.type="run.googleapis.com/request_latencies" AND {scope}',
+    }):
         for point in series.points:
             p95 = max(p95 or 0.0, point.value.double_value)
     return requests, errors, p95
@@ -124,9 +128,14 @@ def main() -> None:
         ok = synthetic_ok(base_url, route) and ok
         time.sleep(15)
 
-    requests, errors, p95 = revision_metrics(
-        os.environ["GCP_PROJECT_ID"], os.environ.get("SERVICE", "shelf"), revision, minutes)
-    result, problems = decide(requests, errors, p95, ok, policy)
+    try:
+        requests, errors, p95 = revision_metrics(
+            os.environ["GCP_PROJECT_ID"], os.environ.get("SERVICE", "shelf"), revision, minutes)
+        result, problems = decide(requests, errors, p95, ok, policy)
+    except Exception as error:  # noqa: BLE001 - any failure here must still end in a decision
+        # Never promote an unverified revision, and never leave traffic split: roll back.
+        requests, errors, p95 = 0, 0, None
+        result, problems = "rollback", [f"metrics unavailable: {type(error).__name__}: {error}"]
     Path("canary.json").write_text(json.dumps({
         "revision": revision, "requests": requests, "errors_5xx": errors, "p95_ms": p95,
         "synthetic_ok": ok, "result": result, "problems": problems,
