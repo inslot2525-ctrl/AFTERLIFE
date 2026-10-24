@@ -1,7 +1,13 @@
 # The ledger. The Undertaker adds a tombstone in each Sunset MR; CI adds the
 # measured savings after release. Every number here links back to a job.
 
-retired: []
+retired:
+  - feature: import_goodreads
+    route: /import/goodreads
+    born: "2023-06-30"
+    died: "2026-10-24"
+    cause: "No calls in the census history (calls_in_window 0, last_seen null), no callers in app/"
+    mr: ""
 
 hibernating: []
 

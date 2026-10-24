@@ -52,16 +52,6 @@ def test_health_answers_on_a_path_cloud_run_does_not_reserve(client):
     assert client.get("/healthz").status_code == 200  # local runs
 
 
-def test_goodreads_import_from_text(client):
-    csv_text = "Title,Author,Exclusive Shelf\nDune,Frank Herbert,read\n"
-    response = client.post("/import/goodreads", json={"csv_text": csv_text})
-    assert response.json() == {"imported": 1}
-
-
-def test_goodreads_import_needs_input(client):
-    assert client.post("/import/goodreads", json={}).status_code == 422
-
-
 def test_wrapped_counts_finished_books(client):
     body = client.get("/wrapped/2025").json()
     assert body["books_finished"] == 2

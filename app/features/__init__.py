@@ -5,14 +5,12 @@ from app.features import (
     books_v1,
     books_v2,
     embed_widget,
-    import_goodreads,
     wrapped,
 )
 
 MODULES = [
     books_v1,
     books_v2,
-    import_goodreads,
     wrapped,
     embed_widget,
     admin_reindex,
