@@ -35,9 +35,9 @@ STYLE = r"""
   backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); box-shadow: inset 0 1px 0 var(--sheen); }
 @media (max-width: 980px) { .totals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.total { padding: 26px 22px 24px; border-left: 1px solid var(--edge); }
+.total { min-width: 0; padding: 26px 18px 24px; border-left: 1px solid var(--edge); }
 .total:first-child { border-left: 0; }
-.total b { display: block; font: 400 clamp(24px, 2.8vw, 34px)/1 var(--display); font-variant-numeric: tabular-nums; color: var(--ink); }
+.total b { display: block; font: 400 clamp(20px, 2.1vw, 28px)/1 var(--display); white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink); }
 .total span { display: block; margin-top: 14px; font: 400 10.5px/1.4 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
 .total.good b { color: var(--mint); text-shadow: 0 0 28px rgba(147, 240, 200, 0.35); }
 
