@@ -10,14 +10,17 @@
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /(^|,)afterlife::sunset(,|$)/
 
+# Deploy jobs wait for Google Cloud: they stay out of the pipeline until the
+# GCP_PROJECT_ID CI/CD variable exists (see docs/runbook-om.md).
 .main:
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push" && $GCP_PROJECT_ID
 
 # Only on the merge commit gate-merge created ("AFTERLIFE: retire <feature> via !N").
+# Same GCP guard as .main: these jobs need promote and rollback.
 .retirement:
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_MESSAGE =~ /AFTERLIFE: retire /'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push" && $GCP_PROJECT_ID && $CI_COMMIT_MESSAGE =~ /AFTERLIFE: retire /'
 
 # Gate jobs need git (python:3.12-slim has none) and the app's requirements.
 .gate:
