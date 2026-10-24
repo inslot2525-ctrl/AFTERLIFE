@@ -37,7 +37,7 @@ def test_prompt_still_describes_that_layout():
     flow = yaml.safe_load(open("flows/afterlife-retire.yml", encoding="utf-8"))
     undertaker = next(p for p in flow["prompts"] if p["prompt_id"] == "afterlife_undertaker")
     system = undertaker["prompt_template"]["system"]
-    for marker in ("Census-Issue: #", "### Deprecation note", "### Verdict", "afterlife-verdict"):
+    for marker in ("Census-Issue: #", "### Deprecation note", "### Verdict", "afterlife-verdict", "orphans"):
         assert marker in system
     reviewer = next(p for p in flow["prompts"] if p["prompt_id"] == "afterlife_reviewer")
     assert "AFTERLIFE-REVIEW: PASS" in reviewer["prompt_template"]["system"]

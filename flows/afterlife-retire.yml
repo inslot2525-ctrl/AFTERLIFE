@@ -143,6 +143,17 @@ prompts:
         - afterlife/policy.yaml and afterlife/graveyard.yaml (read_file).
         - The code: use grep to find anything outside the feature's own module that
           imports or calls it (look in app/ for the module name and its route).
+        - Orphans: for each name the feature's module imports from another app module
+          (for example `from app.catalog import add_books`), grep app/ for other users.
+          A helper nothing else uses would be left behind as dead code, and CI's
+          unused-code gate rejects the MR, so it is part of the retirement.
+
+        What a DEAD verdict does: nothing is deleted by it. CI first switches the
+        feature's flag off in production and holds a vigil; one real request during the
+        vigil turns the flag back on and closes the MR. So callers the census cannot
+        see (a partner, a batch job, another service) are exactly what the vigil tests.
+        If that is your only remaining doubt, say so in the certificate and choose DEAD;
+        use INSUFFICIENT_EVIDENCE when the census numbers themselves don't add up.
 
         For every feature whose `candidate` is true, pick exactly one verdict:
         - DEAD: zero calls in the window, silent at least min_silence_days (or never
@@ -163,7 +174,9 @@ prompts:
         3. At the end of each certificate a fenced block whose info string is
            afterlife-verdict, holding one JSON object with exactly these keys:
            feature, verdict, confidence (0 to 1, reflecting the evidence), evidence
-           (list of strings), files (repo paths the retirement deletes), dependencies
+           (list of strings), files (repo paths the retirement deletes or edits,
+           including the files that hold orphaned helpers), orphans (list of
+           "path:name" helpers that only this feature used, or []), dependencies
            (requirements.txt names only that feature uses), recheck (date or null).
         Say in the note that census history marked simulated is simulated.
 
@@ -199,9 +212,13 @@ prompts:
            `glab mr list --source-branch afterlife/<feature>` shows existing work,
            update that branch and MR instead of creating new ones.
         2. `git checkout -B afterlife/<feature> origin/main`
-        3. Delete the verdict's files with `git rm`. Remove the feature's import and its
-           MODULES entry in app/features/__init__.py. Delete tests in app/tests/ that
+        3. Delete the feature's own module with `git rm`. Remove the feature's import and
+           its MODULES entry in app/features/__init__.py. Delete tests in app/tests/ that
            only exercise this feature.
+        3b. For each "path:name" in the verdict's orphans, delete that function or
+           class from its file with edit_file (keep the rest of the file), and any
+           import it alone needed. Grep app/ again afterwards: nothing may still use
+           it, and nothing new may be left unused.
         4. Remove a dependency from requirements.txt only if grep shows nothing left
            in app/ imports it. Keep the comment lines above it out too.
         5. Add a tombstone under `retired:` in afterlife/graveyard.yaml with: feature,
@@ -251,7 +268,8 @@ prompts:
         1. Only the verdict's files, app/features/__init__.py, the feature's tests,
            requirements.txt and the graveyard tombstone changed.
         2. No protected path from afterlife/policy.yaml is touched.
-        3. Nothing left in app/ still imports or calls what was deleted (grep).
+        3. Nothing left in app/ still imports or calls what was deleted (grep), and
+           every orphaned helper in the verdict is gone, with nothing new left unused.
         4. Any dependency removed from requirements.txt is really unused now.
         5. No migration drops data.
 
