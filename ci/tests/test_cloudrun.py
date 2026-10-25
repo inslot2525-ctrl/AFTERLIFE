@@ -26,3 +26,6 @@ def test_superseded_only_by_a_newer_live_push_pipeline():
     assert not is_superseded([{"id": 12, "source": "push", "status": "running"}], 12)
     assert not is_superseded([{"id": 13, "source": "push", "status": "canceled"}], 12)
     assert not is_superseded([{"id": 13, "source": "api", "status": "running"}], 12)
+    # a newer pipeline that failed (say its runner went offline) will never promote
+    assert not is_superseded([{"id": 13, "source": "push", "status": "failed"}], 12)
+    assert is_superseded([{"id": 13, "source": "push", "status": "success"}], 12)

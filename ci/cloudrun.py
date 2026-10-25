@@ -30,10 +30,18 @@ def tag_url(traffic: list[dict], tag: str) -> str | None:
     return next((t["url"] for t in traffic if t.get("tag") == tag), None)
 
 
+# A newer pipeline in one of these states can still promote, or already has.
+STILL_PROMOTING = {"created", "waiting_for_resource", "preparing", "pending", "running", "scheduled", "success"}
+
+
 def is_superseded(pipelines: list[dict], pipeline_id: int) -> bool:
-    """A newer push pipeline on the branch that hasn't been cancelled or skipped."""
+    """A newer push pipeline on the branch that is still on its way to production.
+
+    A newer pipeline that failed, was cancelled or was skipped never promotes, so
+    stepping aside for it would leave production on an old revision.
+    """
     return any(p["id"] > pipeline_id and p.get("source") == "push"
-               and p.get("status") not in ("canceled", "skipped") for p in pipelines)
+               and p.get("status") in STILL_PROMOTING for p in pipelines)
 
 
 def main() -> None:
