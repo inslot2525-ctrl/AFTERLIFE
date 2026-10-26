@@ -12,9 +12,10 @@
 
 # Deploy jobs wait for Google Cloud: they stay out of the pipeline until the
 # GCP_PROJECT_ID CI/CD variable exists (see docs/runbook-om.md).
+# A "Run pipeline" click on main (source web) also deploys, for manual redeploys.
 .main:
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push" && $GCP_PROJECT_ID
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE =~ /^(push|web)$/ && $GCP_PROJECT_ID
 
 # Only on the merge commit gate-merge created ("AFTERLIFE: retire <feature> via !N").
 # Same GCP guard as .main: these jobs need promote and rollback.
