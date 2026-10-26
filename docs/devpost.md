@@ -79,7 +79,7 @@ file that implements it.
 - It ran for real, end to end. Two features retired with no human step after the census issue: `books_v1` (!1) and
   `import_goodreads` (!2), each merged by CI, canaried on Cloud Run, released and given an obituary. A third,
   `embed_widget` (!3), was switched off, a partner knocked during its vigil, and it came back automatically.
-- The agents decide, and plain code with tests checks every decision before anything changes. 106 tests cover the
+- The agents decide, and plain code with tests checks every decision before anything changes. 109 tests cover the
   gates, the app and the agents' contract with CI.
 - The system says when it's wrong. A resurrection is a first-class outcome, not a failure. Duo Code Review, as a
   second reviewer on every Sunset MR, caught a deleted general test on the first run, and we fixed the Undertaker.
